@@ -1,9 +1,11 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/HW1.dir/Commands.cpp.o"
-  "CMakeFiles/HW1.dir/signals.cpp.o"
-  "CMakeFiles/HW1.dir/smash.cpp.o"
-  "HW1"
+  "CMakeFiles/HW1.dir/Commands.cpp.obj"
+  "CMakeFiles/HW1.dir/signals.cpp.obj"
+  "CMakeFiles/HW1.dir/smash.cpp.obj"
+  "HW1.exe"
+  "HW1.exe.manifest"
   "HW1.pdb"
+  "libHW1.dll.a"
 )
 
 # Per-language clean rules from dependency scanning.

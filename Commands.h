@@ -2,7 +2,8 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
-
+#include <ctime>
+#include <list>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 
@@ -18,13 +19,17 @@ class Command {
 };
 
 class BuiltInCommand : public Command {
- public:
+protected:
+    std::istream * inputStream;
+    std::ostream * outputStream;
+public:
   BuiltInCommand(const char* cmd_line);
   virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
  public:
+    int pid;
   ExternalCommand(const char* cmd_line);
   virtual ~ExternalCommand() {}
   void execute() override;
@@ -76,6 +81,8 @@ class ShowPidCommand : public BuiltInCommand {
   void execute() override;
 };
 
+class BackgroundCommand;
+
 class JobsList;
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
@@ -90,10 +97,16 @@ class QuitCommand : public BuiltInCommand {
 class JobsList {
  public:
   class JobEntry {
+      BackgroundCommand& command;
+      bool isStopped;
+      int jobId;
+      int timeEntered;
    // TODO: Add your data members
   };
  // TODO: Add your data members
- public:
+private:
+    std::list<JobEntry> jobsList;
+public:
   JobsList();
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
@@ -161,6 +174,8 @@ class SmallShell {
   SmallShell();
  public:
     std::string chprompt= "smash> ";
+    JobsList& jobsList;
+    ForegroundCommand* cur;
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
