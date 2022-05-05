@@ -99,15 +99,10 @@ SmallShell::~SmallShell() {
   Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-<<<<<<< HEAD
-  char **args = (char**) malloc(sizeof(char*) * 20);
-=======
+
   char **args = (char**)malloc(sizeof(char*)*20); //check if malloc succesded
 
->>>>>>> origin/master
   int x = _parseCommandLine(cmd_line,args);
-
-
   if(nullptr==args[0])
       return nullptr;
   char* arg1=args[0];
@@ -148,14 +143,13 @@ void SmallShell::executeCommand(const char *cmd_line) {
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
-<<<<<<< HEAD
 Command::Command(const char *cmd_line)
     :cmd_line(cmd_line)
 
 {
 
 }
-=======
+
 void GetCurrDirCommand::execute() {
     long size;
     char *buf;
@@ -165,4 +159,4 @@ void GetCurrDirCommand::execute() {
     if ((buf = (char *)malloc((size_t)size)) != nullptr)
         ptr = getcwd(buf, (size_t)size);
   }
->>>>>>> origin/master
+
