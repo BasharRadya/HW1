@@ -114,8 +114,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   return nullptr;
 }
 
-    void SmallShell::executeCommand(const char *cmd_line) {
+void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
+  String prompt;
   // for example:
   // Command* cmd = CreateCommand(cmd_line);
   // cmd->execute();
