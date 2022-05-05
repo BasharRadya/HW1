@@ -8,33 +8,33 @@
 		<Option virtualFolders="CMake Files\;"/>
 		<Build>
 			<Target title="all">
-				<Option working_dir="/tmp/tmp.52U0pk0Mgt/cmake-build-debug"/>
+				<Option working_dir="/tmp/tmp.Y5WuU27D7T/cmake-build-debug"/>
 				<Option type="4"/>
 				<MakeCommands>
-					<Build command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
-					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="rebuild_cache">
-				<Option working_dir="/tmp/tmp.52U0pk0Mgt/cmake-build-debug"/>
+				<Option working_dir="/tmp/tmp.Y5WuU27D7T/cmake-build-debug"/>
 				<Option type="4"/>
 				<MakeCommands>
-					<Build command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
-					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="HW1">
-				<Option output="/tmp/tmp.52U0pk0Mgt/cmake-build-debug/HW1" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/tmp/tmp.52U0pk0Mgt/cmake-build-debug"/>
+				<Option output="/tmp/tmp.Y5WuU27D7T/cmake-build-debug/HW1" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/tmp/tmp.Y5WuU27D7T/cmake-build-debug"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
 				<Option compiler="gcc"/>
 				<Compiler>
-					<Add directory="/tmp/tmp.52U0pk0Mgt/."/>
+					<Add directory="/tmp/tmp.Y5WuU27D7T/."/>
 					<Add directory="/usr/include/c++/7"/>
 					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
 					<Add directory="/usr/include/c++/7/backward"/>
@@ -45,20 +45,20 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 HW1"/>
-					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 HW1"/>
+					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="HW1/fast">
-				<Option output="/tmp/tmp.52U0pk0Mgt/cmake-build-debug/HW1" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/tmp/tmp.52U0pk0Mgt/cmake-build-debug"/>
+				<Option output="/tmp/tmp.Y5WuU27D7T/cmake-build-debug/HW1" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/tmp/tmp.Y5WuU27D7T/cmake-build-debug"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
 				<Option compiler="gcc"/>
 				<Compiler>
-					<Add directory="/tmp/tmp.52U0pk0Mgt/."/>
+					<Add directory="/tmp/tmp.Y5WuU27D7T/."/>
 					<Add directory="/usr/include/c++/7"/>
 					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
 					<Add directory="/usr/include/c++/7/backward"/>
@@ -69,39 +69,39 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 HW1/fast"/>
-					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 HW1/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="edit_cache">
-				<Option working_dir="/tmp/tmp.52U0pk0Mgt/cmake-build-debug"/>
+				<Option working_dir="/tmp/tmp.Y5WuU27D7T/cmake-build-debug"/>
 				<Option type="4"/>
 				<MakeCommands>
-					<Build command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
-					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.52U0pk0Mgt/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<Build command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/tmp/tmp.Y5WuU27D7T/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 		</Build>
-		<Unit filename="/tmp/tmp.52U0pk0Mgt/Commands.cpp">
+		<Unit filename="/tmp/tmp.Y5WuU27D7T/Commands.cpp">
 			<Option target="HW1"/>
 		</Unit>
-		<Unit filename="/tmp/tmp.52U0pk0Mgt/Commands.h">
+		<Unit filename="/tmp/tmp.Y5WuU27D7T/Commands.h">
 			<Option target="HW1"/>
 		</Unit>
-		<Unit filename="/tmp/tmp.52U0pk0Mgt/signals.cpp">
+		<Unit filename="/tmp/tmp.Y5WuU27D7T/signals.cpp">
 			<Option target="HW1"/>
 		</Unit>
-		<Unit filename="/tmp/tmp.52U0pk0Mgt/signals.h">
+		<Unit filename="/tmp/tmp.Y5WuU27D7T/signals.h">
 			<Option target="HW1"/>
 		</Unit>
-		<Unit filename="/tmp/tmp.52U0pk0Mgt/smash.cpp">
+		<Unit filename="/tmp/tmp.Y5WuU27D7T/smash.cpp">
 			<Option target="HW1"/>
 		</Unit>
-		<Unit filename="/tmp/tmp.52U0pk0Mgt/CMakeLists.txt">
+		<Unit filename="/tmp/tmp.Y5WuU27D7T/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\"/>
 		</Unit>
 	</Project>

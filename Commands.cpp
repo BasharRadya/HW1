@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstdlib>
+#include <unistd.h>
 
 using namespace std;
 
@@ -98,7 +99,7 @@ SmallShell::~SmallShell() {
   Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  char **args = nullptr;
+  char **args = (char**) malloc(sizeof(char*) * 20);
   int x = _parseCommandLine(cmd_line,args);
   cout <<x;
   cout << args[0];
@@ -132,3 +133,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
+Command::Command(const char *cmd_line)
+    :cmd_line(cmd_line)
+
+{
+
+}

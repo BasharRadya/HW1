@@ -9,7 +9,10 @@
 
 class Command {
 // TODO: Add your data members
- public:
+  const std::string cmd_line;
+protected:
+  const char** args;
+public:
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
