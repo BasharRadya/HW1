@@ -157,8 +157,6 @@ class TouchCommand : public BuiltInCommand {
 
 class SmallShell {
  private:
-    int test22;
-    int test11;
   // TODO: Add your data members
   SmallShell();
  public:
