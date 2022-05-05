@@ -9,6 +9,7 @@
 
 class Command {
 // TODO: Add your data members
+
   const std::string cmd_line;
 protected:
   const char** args;
