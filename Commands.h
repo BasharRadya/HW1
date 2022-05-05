@@ -54,8 +54,9 @@ class RedirectionCommand : public Command {
 };
 
     class ChangePromptCommand : public BuiltInCommand {
-// TODO: Add your data members public:
-        ChangePromptCommand(const char* cmd_line, char** plastPwd);
+// TODO: Add your data members
+      public:
+        ChangePromptCommand(const char* cmd_line);
         virtual ~ChangePromptCommand() {}
         void execute() override;
     };

@@ -4,9 +4,9 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
-  "C:/Users/osama/Documents/OS/HW1git/Commands.cpp" "C:/Users/osama/Documents/OS/HW1git/cmake-build-debug/CMakeFiles/HW1.dir/Commands.cpp.obj"
-  "C:/Users/osama/Documents/OS/HW1git/signals.cpp" "C:/Users/osama/Documents/OS/HW1git/cmake-build-debug/CMakeFiles/HW1.dir/signals.cpp.obj"
-  "C:/Users/osama/Documents/OS/HW1git/smash.cpp" "C:/Users/osama/Documents/OS/HW1git/cmake-build-debug/CMakeFiles/HW1.dir/smash.cpp.obj"
+  "/tmp/tmp.52U0pk0Mgt/Commands.cpp" "/tmp/tmp.52U0pk0Mgt/cmake-build-debug/CMakeFiles/HW1.dir/Commands.cpp.o"
+  "/tmp/tmp.52U0pk0Mgt/signals.cpp" "/tmp/tmp.52U0pk0Mgt/cmake-build-debug/CMakeFiles/HW1.dir/signals.cpp.o"
+  "/tmp/tmp.52U0pk0Mgt/smash.cpp" "/tmp/tmp.52U0pk0Mgt/cmake-build-debug/CMakeFiles/HW1.dir/smash.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 
