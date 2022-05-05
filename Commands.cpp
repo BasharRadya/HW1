@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstdlib>
+#include <unistd.h>
 
 using namespace std;
 
@@ -98,16 +99,27 @@ SmallShell::~SmallShell() {
   Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  char **args = nullptr;
+  char **args = (char**)malloc(sizeof(char*)*20); //check if malloc succesded
+
   int x = _parseCommandLine(cmd_line,args);
-  cout <<x;
-  cout << args[0];
-   //if (firstWord.compare("chprompt") == 0) {
-     // return new ChangePromptCommand(cmd_line);
-    //}
-  //  if (firstWord.compare("pwd") == 0) {
-//    return new GetCurrDirCommand(cmd_line);
-  //}
+
+
+  if(nullptr==args[0])
+      return nullptr;
+  char* arg1=args[0];
+
+   if (firstWord.compare("chprompt") == 0) {
+       if(nullptr==args[1]){
+           this->chprompt="smash> ";
+           return nullptr;}
+       char* arg2=args[1];
+       this->chprompt=arg2;
+       this->chprompt.append(std::string("> "));
+     }
+
+    if (firstWord.compare("pwd") == 0) {
+        return new GetCurrDirCommand(cmd_line);
+   }
     // For example:
 /*
   else if (firstWord.compare("showpid") == 0) {
@@ -127,8 +139,17 @@ void SmallShell::executeCommand(const char *cmd_line) {
   std::string prompt;
   int test;
   Command* cmd = CreateCommand(cmd_line);
-  //cmd->execute();
+  cmd->execute();
 
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
+void GetCurrDirCommand::execute() {
+    long size;
+    char *buf;
+    char *ptr;
+    size = pathconf(".", _PC_PATH_MAX);
+
+    if ((buf = (char *)malloc((size_t)size)) != nullptr)
+        ptr = getcwd(buf, (size_t)size);
+  }
