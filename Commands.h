@@ -126,6 +126,7 @@ class JobsCommand : public BuiltInCommand {
   JobsCommand(const char* cmd_line, JobsList* jobs);
   virtual ~JobsCommand() {}
   void execute() override;
+
 };
 
 class KillCommand : public BuiltInCommand {
