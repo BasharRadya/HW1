@@ -131,6 +131,8 @@ public:
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
   // TODO: Add extra methods or modify exisitng ones as needed
+  JobEntry& operator[](int x) ;
+
 };
 
 class JobsCommand : public BuiltInCommand {

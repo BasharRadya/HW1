@@ -116,6 +116,8 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   char* arg1=args[0];
 
    if (firstWord.compare("chprompt") == 0) {
+
+       getInstance().jobsList.addJob(new ExternalCommand(cmd_line), false);
        return new ChangePromptCommand(cmd_line);
      }
 
@@ -262,6 +264,17 @@ void JobsList::addJob(ExternalCommand *cmd, bool isStopped) {
     JobEntry newjob(*cmd, isStopped, newjob_id, newjob_time);
 }
 
+void JobsList::printJobsList() {
+    int size=jobsList.size();
+
+}
+
+JobsList::JobEntry &JobsList::operator[](int x)  {
+    std::list<JobEntry>::iterator it = jobsList.begin();
+  // Advance the iterator by x positions,
+     std::advance(it, x);
+}
+
 
 JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 
@@ -278,4 +291,20 @@ JobsList::JobEntry::JobEntry(ExternalCommand &command, bool isStopped, int jobId
 
 bool JobsList::JobEntry::operator<(JobsList::JobEntry &job) const {
     return this->jobId < job.jobId;
+}
+
+ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) ,pid(0){
+
+}
+
+void ExternalCommand::execute() {
+    pid_t pid =fork();
+    if (pid == 0){
+        execv(args[0],args);
+
+    }
+    else{
+
+    }
+
 }
