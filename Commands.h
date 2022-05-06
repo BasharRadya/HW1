@@ -114,6 +114,7 @@ class JobsList {
       int jobId;
       time_t time_insert;
    JobEntry(Command& command,bool isStopped,int jobId,time_t time_insert);
+   bool operator<(JobEntry& job) const;
   };
  // TODO: Add your data members
 private:
@@ -185,13 +186,15 @@ class TouchCommand : public BuiltInCommand {
 class SmallShell {
  private:
   // TODO: Add your data members
+  std::string* prevDir;
   SmallShell();
  public:
     std::string prompt;
     JobsList jobsList;
     ForegroundCommand* cur;
-    std::string* prevDir;
-
+    bool prevDirExists();
+    std::string getPrevDir();
+    void changePrevDir(std::string prev);
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator

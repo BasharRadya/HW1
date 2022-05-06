@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <cstdlib>
 #include <unistd.h>
+#include <cassert>
 
 using namespace std;
 
@@ -154,6 +155,20 @@ void SmallShell::executeCommand(const char *cmd_line) {
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
+bool SmallShell::prevDirExists() {
+    return (prevDir != nullptr);
+}
+
+std::string SmallShell::getPrevDir() {
+    assert(prevDir != nullptr);
+    return *prevDir;
+}
+
+void SmallShell::changePrevDir(std::string prev) {
+    delete prevDir;
+    prevDir = new std::string(prev);
+}
+
 Command::Command(const char *cmd_line)
     :cmd_line(cmd_line),
      args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1)))
@@ -208,16 +223,14 @@ void ChangeDirCommand::execute() {
         std::string prevDir = GetCurrDirCommand::getCurDir();
         int changeResult;
         if (std::string(args[1]) == std::string("-")){
-            changeResult = chdir(smash.prevDir->c_str());
+            changeResult = chdir(smash.getPrevDir().c_str());
         }else{
             changeResult = chdir(args[1]);
         }
         if (changeResult == CHANGE_FAILURE){
             //TODO
         }else{
-            std::string* temp = new std::string(prevDir);
-            delete smash.prevDir;
-            smash.prevDir = temp;
+            smash.changePrevDir(prevDir);
         }
     }else{
         *outputStream << "smash error: cd: too many arguments" << std::endl;
@@ -235,7 +248,7 @@ JobsList::JobsList()
 }
 
 void JobsList::addJob(Command *cmd, bool isStopped) {
-    //jobsList.sort();
+    jobsList.sort();
     int newjob_id;
     int size=jobsList.size();
     if (jobsList.empty()== true){
@@ -261,4 +274,8 @@ void JobsCommand::execute() {
 JobsList::JobEntry::JobEntry(Command &command, bool isStopped, int jobId, time_t time_insert)
                             :command(command),isStopped(isStopped),jobId(jobId),time_insert(time_insert) {
 
+}
+
+bool JobsList::JobEntry::operator<(JobsList::JobEntry &job) const {
+    return this->jobId < job.jobId;
 }
