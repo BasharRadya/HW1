@@ -213,6 +213,10 @@ void ChangeDirCommand::execute() {
         }
         if (changeResult == CHANGE_FAILURE){
             //TODO
+        }else{
+            std::string* temp = new std::string(prevDir);
+            delete smash.prevDir;
+            smash.prevDir = temp;
         }
     }else{
         *outputStream << "smash error: cd: too many arguments" << std::endl;
