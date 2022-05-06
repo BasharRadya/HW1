@@ -108,17 +108,18 @@ class QuitCommand : public BuiltInCommand {
 class JobsList {
  public:
   class JobEntry {
-      BackgroundCommand& command;
+  public:
+      Command& command;
       bool isStopped;
       int jobId;
-      int timeEntered;
-   // TODO: Add your data members
+      time_t time_insert;
+   JobEntry(Command& command,bool isStopped,int jobId,time_t time_insert);
   };
  // TODO: Add your data members
 private:
     std::list<JobEntry> jobsList;
 public:
-  JobsList();
+   JobsList();
   ~JobsList(){};
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();
@@ -134,7 +135,7 @@ public:
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
+  JobsCommand(const char *cmd_Line);
   virtual ~JobsCommand() {}
   void execute() override;
 

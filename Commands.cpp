@@ -126,9 +126,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ChangeDirCommand(cmd_line);
     }
 
-    /*if (firstWord.compare("jobs") == 0) {
+    if (firstWord.compare("jobs") == 0) {
         return new JobsCommand(cmd_line);
-    }*/
+    }
     // For example:
 /*
   else if (firstWord.compare("showpid") == 0) {
@@ -144,11 +144,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-  // TODO: Add your implementation here
-  std::string prompt;
-  int test;
-  Command* cmd = CreateCommand(cmd_line);
-  cmd->execute();
+    // TODO: Add your implementation here
+    std::string prompt;
+    int test;
+    Command *cmd = CreateCommand(cmd_line);
+    if (cmd != nullptr){
+    cmd->execute();}
 
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
@@ -230,5 +231,34 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line) : BuiltInCommand(cmd_li
 JobsList::JobsList()
     :jobsList(std::list<JobEntry>())
 {
+
+}
+
+void JobsList::addJob(Command *cmd, bool isStopped) {
+    //jobsList.sort();
+    int newjob_id;
+    int size=jobsList.size();
+    if (jobsList.empty()== true){
+        newjob_id=1;
+    }else{
+        newjob_id=jobsList.back().jobId+1;
+    }
+    time_t newjob_time;
+    time(&newjob_time);
+
+    JobEntry newjob(*cmd, isStopped, newjob_id, newjob_time);
+}
+
+
+JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
+
+}
+
+void JobsCommand::execute() {
+
+}
+
+JobsList::JobEntry::JobEntry(Command &command, bool isStopped, int jobId, time_t time_insert)
+                            :command(command),isStopped(isStopped),jobId(jobId),time_insert(time_insert) {
 
 }
