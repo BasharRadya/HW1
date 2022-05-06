@@ -109,11 +109,11 @@ class JobsList {
  public:
   class JobEntry {
   public:
-      Command& command;
+      ExternalCommand& command;
       bool isStopped;
       int jobId;
       time_t time_insert;
-   JobEntry(Command& command,bool isStopped,int jobId,time_t time_insert);
+   JobEntry(ExternalCommand& command,bool isStopped,int jobId,time_t time_insert);
    bool operator<(JobEntry& job) const;
   };
  // TODO: Add your data members
@@ -122,7 +122,7 @@ private:
 public:
    JobsList();
   ~JobsList(){};
-  void addJob(Command* cmd, bool isStopped = false);
+  void addJob(ExternalCommand* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();

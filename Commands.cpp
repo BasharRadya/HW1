@@ -247,7 +247,7 @@ JobsList::JobsList()
 
 }
 
-void JobsList::addJob(Command *cmd, bool isStopped) {
+void JobsList::addJob(ExternalCommand *cmd, bool isStopped) {
     jobsList.sort();
     int newjob_id;
     int size=jobsList.size();
@@ -271,7 +271,7 @@ void JobsCommand::execute() {
 
 }
 
-JobsList::JobEntry::JobEntry(Command &command, bool isStopped, int jobId, time_t time_insert)
+JobsList::JobEntry::JobEntry(ExternalCommand &command, bool isStopped, int jobId, time_t time_insert)
                             :command(command),isStopped(isStopped),jobId(jobId),time_insert(time_insert) {
 
 }
