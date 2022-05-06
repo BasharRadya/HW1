@@ -63,10 +63,10 @@ RM = /snap/cmake/580/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /tmp/tmp.80pY1FLhmr
+CMAKE_SOURCE_DIR = /tmp/tmp.OZqWottBOu
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /tmp/tmp.80pY1FLhmr/cmake-build-debug
+CMAKE_BINARY_DIR = /tmp/tmp.OZqWottBOu/cmake-build-debug
 
 # Include any dependencies generated for this target.
 include CMakeFiles/HW1.dir/depend.make
@@ -79,42 +79,42 @@ include CMakeFiles/HW1.dir/flags.make
 
 CMakeFiles/HW1.dir/Commands.cpp.o: CMakeFiles/HW1.dir/flags.make
 CMakeFiles/HW1.dir/Commands.cpp.o: ../Commands.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/tmp/tmp.80pY1FLhmr/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/HW1.dir/Commands.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/HW1.dir/Commands.cpp.o -c /tmp/tmp.80pY1FLhmr/Commands.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/tmp/tmp.OZqWottBOu/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/HW1.dir/Commands.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/HW1.dir/Commands.cpp.o -c /tmp/tmp.OZqWottBOu/Commands.cpp
 
 CMakeFiles/HW1.dir/Commands.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/HW1.dir/Commands.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /tmp/tmp.80pY1FLhmr/Commands.cpp > CMakeFiles/HW1.dir/Commands.cpp.i
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /tmp/tmp.OZqWottBOu/Commands.cpp > CMakeFiles/HW1.dir/Commands.cpp.i
 
 CMakeFiles/HW1.dir/Commands.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/HW1.dir/Commands.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /tmp/tmp.80pY1FLhmr/Commands.cpp -o CMakeFiles/HW1.dir/Commands.cpp.s
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /tmp/tmp.OZqWottBOu/Commands.cpp -o CMakeFiles/HW1.dir/Commands.cpp.s
 
 CMakeFiles/HW1.dir/signals.cpp.o: CMakeFiles/HW1.dir/flags.make
 CMakeFiles/HW1.dir/signals.cpp.o: ../signals.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/tmp/tmp.80pY1FLhmr/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/HW1.dir/signals.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/HW1.dir/signals.cpp.o -c /tmp/tmp.80pY1FLhmr/signals.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/tmp/tmp.OZqWottBOu/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/HW1.dir/signals.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/HW1.dir/signals.cpp.o -c /tmp/tmp.OZqWottBOu/signals.cpp
 
 CMakeFiles/HW1.dir/signals.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/HW1.dir/signals.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /tmp/tmp.80pY1FLhmr/signals.cpp > CMakeFiles/HW1.dir/signals.cpp.i
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /tmp/tmp.OZqWottBOu/signals.cpp > CMakeFiles/HW1.dir/signals.cpp.i
 
 CMakeFiles/HW1.dir/signals.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/HW1.dir/signals.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /tmp/tmp.80pY1FLhmr/signals.cpp -o CMakeFiles/HW1.dir/signals.cpp.s
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /tmp/tmp.OZqWottBOu/signals.cpp -o CMakeFiles/HW1.dir/signals.cpp.s
 
 CMakeFiles/HW1.dir/smash.cpp.o: CMakeFiles/HW1.dir/flags.make
 CMakeFiles/HW1.dir/smash.cpp.o: ../smash.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/tmp/tmp.80pY1FLhmr/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/HW1.dir/smash.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/HW1.dir/smash.cpp.o -c /tmp/tmp.80pY1FLhmr/smash.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/tmp/tmp.OZqWottBOu/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/HW1.dir/smash.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/HW1.dir/smash.cpp.o -c /tmp/tmp.OZqWottBOu/smash.cpp
 
 CMakeFiles/HW1.dir/smash.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/HW1.dir/smash.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /tmp/tmp.80pY1FLhmr/smash.cpp > CMakeFiles/HW1.dir/smash.cpp.i
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /tmp/tmp.OZqWottBOu/smash.cpp > CMakeFiles/HW1.dir/smash.cpp.i
 
 CMakeFiles/HW1.dir/smash.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/HW1.dir/smash.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /tmp/tmp.80pY1FLhmr/smash.cpp -o CMakeFiles/HW1.dir/smash.cpp.s
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /tmp/tmp.OZqWottBOu/smash.cpp -o CMakeFiles/HW1.dir/smash.cpp.s
 
 # Object files for target HW1
 HW1_OBJECTS = \
@@ -130,7 +130,7 @@ HW1: CMakeFiles/HW1.dir/signals.cpp.o
 HW1: CMakeFiles/HW1.dir/smash.cpp.o
 HW1: CMakeFiles/HW1.dir/build.make
 HW1: CMakeFiles/HW1.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/tmp/tmp.80pY1FLhmr/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable HW1"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/tmp/tmp.OZqWottBOu/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable HW1"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/HW1.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -143,6 +143,6 @@ CMakeFiles/HW1.dir/clean:
 .PHONY : CMakeFiles/HW1.dir/clean
 
 CMakeFiles/HW1.dir/depend:
-	cd /tmp/tmp.80pY1FLhmr/cmake-build-debug && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /tmp/tmp.80pY1FLhmr /tmp/tmp.80pY1FLhmr /tmp/tmp.80pY1FLhmr/cmake-build-debug /tmp/tmp.80pY1FLhmr/cmake-build-debug /tmp/tmp.80pY1FLhmr/cmake-build-debug/CMakeFiles/HW1.dir/DependInfo.cmake --color=$(COLOR)
+	cd /tmp/tmp.OZqWottBOu/cmake-build-debug && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /tmp/tmp.OZqWottBOu /tmp/tmp.OZqWottBOu /tmp/tmp.OZqWottBOu/cmake-build-debug /tmp/tmp.OZqWottBOu/cmake-build-debug /tmp/tmp.OZqWottBOu/cmake-build-debug/CMakeFiles/HW1.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/HW1.dir/depend
 

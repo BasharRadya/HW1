@@ -4,6 +4,7 @@
 #include <vector>
 #include <ctime>
 #include <list>
+#include <stack>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 
@@ -12,10 +13,11 @@ class Command {
 
   const std::string cmd_line;
 protected:
-  const char** args;
+    static const int MAX_ARGS_NUM = 21;
+    char** args;
 public:
   Command(const char* cmd_line);
-  virtual ~Command();
+  virtual ~Command(){};
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
@@ -67,6 +69,9 @@ class RedirectionCommand : public Command {
 
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
+private:
+    const static int CHANGE_FAILURE = -1;
+public:
   ChangeDirCommand(const char* cmd_line, char** plastPwd);
   virtual ~ChangeDirCommand() {}
   void execute() override;
@@ -77,6 +82,7 @@ class GetCurrDirCommand : public BuiltInCommand {
   GetCurrDirCommand(const char* cmd_line);
   virtual ~GetCurrDirCommand() {}
   void execute() override;
+  static std::string getCurDir();
 };
 
 class ShowPidCommand : public BuiltInCommand {
@@ -180,9 +186,11 @@ class SmallShell {
   // TODO: Add your data members
   SmallShell();
  public:
-    std::string chprompt= "smash> ";
-    JobsList& jobsList;
+    std::string prompt;
+    JobsList jobsList;
     ForegroundCommand* cur;
+    std::string* prevDir;
+
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator

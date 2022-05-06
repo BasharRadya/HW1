@@ -85,7 +85,14 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell(): jobsList(jobsList) {
+SmallShell::SmallShell()
+    :prompt("smash> "),
+     jobsList(JobsList()),
+     cur(nullptr),
+     prevDir(nullptr)
+
+{
+
 // TODO: add your implementation
 }
 
@@ -96,11 +103,11 @@ SmallShell::~SmallShell() {
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
-  Command * SmallShell::CreateCommand(const char* cmd_line) {
+Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-  char **args = (char**)malloc(sizeof(char*)*20); //check if malloc succesded
+  char **args = (char**)malloc(sizeof(char*)*22); //check if malloc succesded
 
   int x = _parseCommandLine(cmd_line,args);
   if(nullptr==args[0])
@@ -108,12 +115,7 @@ SmallShell::~SmallShell() {
   char* arg1=args[0];
 
    if (firstWord.compare("chprompt") == 0) {
-       if(nullptr==args[1]){
-           this->chprompt="smash> ";
-           return nullptr;}
-       char* arg2=args[1];
-       this->chprompt=arg2;
-       this->chprompt.append(std::string("> "));
+       return new ChangePromptCommand(cmd_line);
      }
 
     if (firstWord.compare("pwd") == 0) {
@@ -144,19 +146,63 @@ void SmallShell::executeCommand(const char *cmd_line) {
 }
 
 Command::Command(const char *cmd_line)
-    :cmd_line(cmd_line)
+    :cmd_line(cmd_line),
+     args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1)))
 
 {
-
+    _parseCommandLine(cmd_line, args);
 }
 
 void GetCurrDirCommand::execute() {
-    long size;
-    char *buf;
-    char *ptr;
-    size = pathconf(".", _PC_PATH_MAX);
+    *outputStream << getCurDir() << std::endl;
+}
 
-    if ((buf = (char *)malloc((size_t)size)) != nullptr)
-        ptr = getcwd(buf, (size_t)size);
-  }
+GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line)
+    : BuiltInCommand(cmd_line)
+{}
 
+std::string GetCurrDirCommand::getCurDir() {
+    int size = pathconf(".", _PC_PATH_MAX);
+    char curDir[size];
+    getcwd(curDir,sizeof(curDir));
+    return std::string(curDir);
+}
+
+BuiltInCommand::BuiltInCommand(const char* cmd_line)
+    :Command(cmd_line)
+{}
+
+void ChangePromptCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    if(nullptr == args[1]){
+        smash.prompt = "smash> ";
+    }
+    const char* arg2 = args[1];
+    smash.prompt = arg2;
+    smash.prompt.append(std::string("> "));
+}
+
+void ShowPidCommand::execute() {
+    *outputStream << "smash pid is " << getpid() << std::endl;
+}
+
+void ChangeDirCommand::execute() {
+    if (args[1] == nullptr){
+        //TODO
+    }else if (args[2] == nullptr){
+        SmallShell& smash = SmallShell::getInstance();
+        std::string prevDir = GetCurrDirCommand::getCurDir();
+        int changeResult;
+        if (std::string(args[1]) == std::string("-")){
+            changeResult = chdir(smash.prevDir->c_str());
+        }else{
+            changeResult = chdir(args[1]);
+        }
+        if (changeResult == CHANGE_FAILURE){
+            //TODO
+        }
+    }else{
+        *outputStream << "smash error: cd: too many arguments" << std::endl;
+    }
+
+}
