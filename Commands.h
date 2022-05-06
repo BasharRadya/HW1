@@ -72,7 +72,7 @@ class ChangeDirCommand : public BuiltInCommand {
 private:
     const static int CHANGE_FAILURE = -1;
 public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
+  ChangeDirCommand(const char* cmd_line);
   virtual ~ChangeDirCommand() {}
   void execute() override;
 };
@@ -119,7 +119,7 @@ private:
     std::list<JobEntry> jobsList;
 public:
   JobsList();
-  ~JobsList();
+  ~JobsList(){};
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();

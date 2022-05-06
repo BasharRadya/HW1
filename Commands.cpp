@@ -121,6 +121,14 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     if (firstWord.compare("pwd") == 0) {
         return new GetCurrDirCommand(cmd_line);
    }
+
+    if (firstWord.compare("cd") == 0) {
+        return new ChangeDirCommand(cmd_line);
+    }
+
+    /*if (firstWord.compare("jobs") == 0) {
+        return new JobsCommand(cmd_line);
+    }*/
     // For example:
 /*
   else if (firstWord.compare("showpid") == 0) {
@@ -182,6 +190,10 @@ void ChangePromptCommand::execute() {
     smash.prompt.append(std::string("> "));
 }
 
+ChangePromptCommand::ChangePromptCommand(const char *cmd_line) : BuiltInCommand(cmd_line)
+
+{}
+
 void ShowPidCommand::execute() {
     *outputStream << "smash pid is " << getpid() << std::endl;
 }
@@ -204,5 +216,14 @@ void ChangeDirCommand::execute() {
     }else{
         *outputStream << "smash error: cd: too many arguments" << std::endl;
     }
+
+}
+
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line)
+{}
+
+JobsList::JobsList()
+    :jobsList(std::list<JobEntry>())
+{
 
 }
