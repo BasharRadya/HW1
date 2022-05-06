@@ -173,11 +173,12 @@ std::string GetCurrDirCommand::getCurDir() {
     int size = pathconf(".", _PC_PATH_MAX);
     char curDir[size];
     getcwd(curDir,sizeof(curDir));
+    std::string temp(curDir);
     return std::string(curDir);
 }
 
 BuiltInCommand::BuiltInCommand(const char* cmd_line)
-    :Command(cmd_line)
+    :Command(cmd_line), inputStream(&cin), outputStream(&cout)
 {}
 
 void ChangePromptCommand::execute() {
