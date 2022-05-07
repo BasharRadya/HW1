@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <cassert>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -46,8 +47,97 @@ string _trim(const std::string& s)
   return _rtrim(_ltrim(s));
 }
 
+bool isPrefixOf(const char* prefix, const char* str){
+    while(*prefix != '\0'){
+        if (*str != *prefix){
+            return false;
+        }
+        str++;
+        prefix++;
+    }
+    return true;
+}
+
+int _countRedirections(const char * cmd_line) {
+    const char *cur = cmd_line;
+    int count = 0;
+    while (*cur != '\0') {
+        if (isPrefixOf("|&", cur)) {
+            count++;
+            cur += 2;
+            continue;
+        }
+        if (isPrefixOf("|", cur)) {
+            count++;
+            cur++;
+            continue;
+        }
+        if (isPrefixOf(">>", cur)) {
+            count++;
+            cur += 2;
+            continue;
+        }
+        if (isPrefixOf(">", cur)) {
+            count++;
+            cur++;
+            continue;
+        }
+        cur++;
+    }
+    return  count;
+}
+void writeStrWithoutTermination(const char* copiedFrom, char* copiedTo){
+    while(*copiedFrom != '\0'){
+        *copiedTo = *copiedFrom;
+        copiedTo++;
+        copiedFrom++;
+    }
+}
+char* _addSpacesBeforeRedirections(const char * cmd_line){
+    int redirectionTimes = _countRedirections(cmd_line);
+    int len = std::string(cmd_line).length();
+    char* temp = (char*) malloc(sizeof(char) * (len + redirectionTimes + 1));
+    const char * copiedFrom = cmd_line;
+    char * copiedTo = temp;
+    while(*copiedFrom != '\0'){
+        if (isPrefixOf("|&", copiedFrom)){
+            writeStrWithoutTermination(" |& ", copiedTo);
+            copiedFrom += 2;
+            copiedTo += 4;
+            continue;
+        }
+        if (isPrefixOf("|", copiedFrom)){
+            writeStrWithoutTermination(" | ", copiedTo);
+            copiedFrom += 1;
+            copiedTo += 3;
+            continue;
+        }
+        if (isPrefixOf(">>", copiedFrom)){
+            writeStrWithoutTermination(" >> ", copiedTo);
+            copiedFrom += 2;
+            copiedTo += 4;
+            continue;
+        }
+        if (isPrefixOf(">", copiedFrom)){
+            writeStrWithoutTermination(" > ", copiedTo);
+            copiedFrom += 1;
+            copiedTo += 3;
+            continue;
+        }
+        *copiedTo = *copiedFrom;
+        copiedFrom++;
+        copiedTo++;
+    }
+    *copiedTo = '\0';
+    return temp;
+}
+
+
 int _parseCommandLine(const char* cmd_line, char** args) {
   FUNC_ENTRY()
+
+  cmd_line = _addSpacesBeforeRedirections(cmd_line);
+
   int i = 0;
   std::istringstream iss(_trim(string(cmd_line)).c_str());
   for(std::string s; iss >> s; ) {
@@ -119,19 +209,16 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
        getInstance().jobsList.addJob(new ExternalCommand(cmd_line), false);
        return new ChangePromptCommand(cmd_line);
-     }
-
-    if (firstWord.compare("pwd") == 0) {
+     }else if (firstWord.compare("pwd") == 0) {
         return new GetCurrDirCommand(cmd_line);
+   }else if (firstWord.compare("cd") == 0) {
+        return new ChangeDirCommand(cmd_line);
+   }else if (firstWord.compare("jobs") == 0) {
+        return new JobsCommand(cmd_line);
+   }else{
+       return new CommandsPack(cmd_line);
    }
 
-    if (firstWord.compare("cd") == 0) {
-        return new ChangeDirCommand(cmd_line);
-    }
-
-    if (firstWord.compare("jobs") == 0) {
-        return new JobsCommand(cmd_line);
-    }
     // For example:
 /*
   else if (firstWord.compare("showpid") == 0) {
@@ -171,11 +258,21 @@ void SmallShell::changePrevDir(std::string prev) {
     prevDir = new std::string(prev);
 }
 
-Command::Command(const char *cmd_line)
+Command::Command(const char * cmd_line)
     :cmd_line(cmd_line),
      args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1)))
 
 {
+    if (_isBackgroundComamnd(cmd_line)){
+        int len = strlen(cmd_line);
+        char* temp = (char*) malloc(sizeof(char) * (len + 1));
+        strcpy(temp, cmd_line);
+        _removeBackgroundSign(temp);
+        cmd_line = temp;
+        doesRunInBackground = true;
+    }else{
+        doesRunInBackground = false;
+    }
     _parseCommandLine(cmd_line, args);
 }
 
@@ -262,6 +359,7 @@ void JobsList::addJob(ExternalCommand *cmd, bool isStopped) {
     time(&newjob_time);
 
     JobEntry newjob(*cmd, isStopped, newjob_id, newjob_time);
+    jobsList.push_back(newjob);
 }
 
 void JobsList::printJobsList() {
@@ -298,13 +396,171 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) ,pid(
 }
 
 void ExternalCommand::execute() {
-    pid_t pid =fork();
-    if (pid == 0){
-        execv(args[0],args);
-
+    int result = setpgrp();
+    if(result == FAILURE){
+        //TODO
     }
-    else{
+    execv(args[0],args);
+}
 
+CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line) {
+    if (!isCmdLegal()){
+        //TODO
+        return;
     }
+    const static int MAX_PROCESSES_NUM = 100;
+    int curArg = 0;
+    int curProgramIndex = 0;
+    while(true){
+        if (endOfTextDetected(curArg)){
+            break;
+        }
+        if (redirectionDetected(curArg)){
+            curArg = setRedirection(curArg);
+            continue;
+        }
+        curArg = addProgram(curArg);
+        curProgramIndex++;
+    }
+    this->processesNum = curProgramIndex;
+}
+
+bool CommandsPack::isCmdLegal() const {
+    return true;
+}
+
+bool CommandsPack::endOfTextDetected(int curArg) const {
+    return (args[curArg] == nullptr);
+}
+
+bool areEqual(std::string const & string1, std::string const & string2){
+    return string1 == string2;
+}
+
+bool CommandsPack::redirectionDetected(int curArg) const {
+    return (areEqual(args[curArg], ">") ||
+            areEqual(args[curArg], ">>") ||
+            areEqual(args[curArg], "|") ||
+            areEqual(args[curArg], "&|"));
+}
+
+int CommandsPack::setRedirection(int curArg) {
+    if (areEqual(args[curArg], "|")){
+        programs.back().pipeType = P_NORMAL;
+        return curArg + 1;
+    }else if (areEqual(args[curArg], "&|")){
+        programs.back().pipeType = P_ERR;
+        return curArg + 1;
+    }else if (areEqual(args[curArg], ">")){
+        outFileType = R_NORMAL;
+        *outFile = std::string(args[curArg + 1]);
+        return curArg + 2;
+    }else if (areEqual(args[curArg], ">>")){
+        outFileType = R_APPEND;
+        *outFile = std::string(args[curArg + 1]);
+        return curArg + 2;
+    }
+}
+
+int CommandsPack::addProgram(int curArg) {
+    (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
+    int cur = curArg;
+    std::string cmd("");
+    while(!endOfTextDetected(cur) && !redirectionDetected(cur)){
+        cmd += std::string(args[cur]) + std::string(" ");
+        cur++;
+    }
+    programs.emplace_back(ExternalCommand(cmd.c_str()));
+    //TODO
+}
+
+void CommandsPack::execute() {
+    auto i = programs.begin();
+    int* prevFd = nullptr;
+    int* curFd = nullptr;
+    while(i != programs.end()) {
+        prevFd = curFd;
+        if (!(i->isLast())){
+            curFd = new int[2];
+            pipe(curFd);
+        }
+        int forkResult = fork();
+        if (forkResult == 0) {
+            if (!(i->isLast())) {
+                dup2(curFd[1], 1);
+                close(curFd[0]);
+                close(curFd[1]);
+            }else if (outFileType != R_NORMAL){
+                int outFD = open(inFile->c_str(), O_WRONLY|O_CREAT|O_TRUNC); //check last
+                dup2(outFD, 1);
+                close(outFD);
+            }else if (outFileType == R_APPEND){
+                int outFD = open(inFile->c_str(), O_WRONLY|O_CREAT|O_APPEND); //check last
+                dup2(outFD, 1);
+                close(outFD);
+            }
+            if (prevFd != nullptr){
+                dup2(prevFd[0],0);
+                close(prevFd[0]);
+                close(prevFd[1]);
+            }
+            i->command.execute();
+            delete prevFd;
+            delete curFd;
+            break;
+        }
+        //save pid in command in father process
+        i->command.pid = forkResult;
+        delete prevFd;
+        ++i;
+    }
+    delete curFd;
 
 }
+/*
+KillCommand::KillCommand(const char *cmd_line)
+    : BuiltInCommand(cmd_line)
+{}
+
+int str2int(std::string s){
+    int x;
+    std::stringstream ss;
+    ss << s;
+    ss >> x;
+    return x;
+}
+
+void KillCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    JobsList::JobEntry* job;
+    int jobId = str2int(args[1]);
+    try{
+        job = smash.jobsList.getJobById(jobId);
+    }catch(JobDoesntExist&){
+        *outputStream << "smash error: kill: job-id " << jobId << " does not exist" << std:endl;
+        return;
+    }
+    ExternalCommand& cmd = job->command;
+    pid_t pid = cmd.pid;
+    int signal = str2int(args[2]);
+    int result = kill(pid, signal);
+    if (result == SYSCALL_FAILURE){
+        //TODO
+    }
+    if (signal == SIGSTOP){
+        job->isStopped = true;
+    }
+    if (signal == SIGCONT){
+        job->isStopped = false;
+    }
+    *outputStream << "signal number " << signal << " was sent to pid " << pid;
+}
+*/
+CommandsPack::Program::Program(ExternalCommand commmand)
+    :command(command), pipeType(P_NONE)
+{}
+
+bool CommandsPack::Program::isLast() const {
+    return pipeType == P_NONE;
+}
+

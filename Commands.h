@@ -7,7 +7,7 @@
 #include <stack>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
-
+const static int FAILURE = -1;
 class Command {
 // TODO: Add your data members
 
@@ -15,9 +15,11 @@ class Command {
 protected:
     static const int MAX_ARGS_NUM = 21;
     char** args;
+    bool doesRunInBackground;
 public:
   Command(const char* cmd_line);
   virtual ~Command(){};
+
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
@@ -34,10 +36,39 @@ public:
 };
 
 class ExternalCommand : public Command {
- public:
-    int pid;
-  ExternalCommand(const char* cmd_line);
-  virtual ~ExternalCommand() {}
+    public:
+        pid_t pid;
+        ExternalCommand(const char* cmd_line);
+        virtual ~ExternalCommand() {}
+        void execute() override;
+    };
+
+class CommandsPack : public Command {
+private:
+    enum RedirectionType{R_NONE, R_NORMAL, R_APPEND};
+    enum PipeType{P_NONE, P_NORMAL, P_ERR};
+    class Program{
+    public:
+        ExternalCommand command;
+        PipeType pipeType;
+        Program(ExternalCommand commmand);
+        bool isLast() const;
+    };
+    std::list<Program> programs;
+    std::string* inFile;
+
+    std::string* outFile;
+    RedirectionType outFileType;
+    int processesNum;
+    bool isCmdLegal() const;
+    bool endOfTextDetected(int curArg) const;
+    bool redirectionDetected(int curArg) const;
+    int setRedirection(int curArg);
+    int addProgram(int curArg);
+public:
+
+    CommandsPack(const char* cmd_line);
+    ~CommandsPack() override = default;
   void execute() override;
 };
 
@@ -130,6 +161,7 @@ public:
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
+  void updateJobStatusAsStopped(int jobId);
   // TODO: Add extra methods or modify exisitng ones as needed
   JobEntry& operator[](int x) ;
 
@@ -148,7 +180,7 @@ class JobsCommand : public BuiltInCommand {
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
+  KillCommand(const char* cmd_line);
   virtual ~KillCommand() {}
   void execute() override;
 };
