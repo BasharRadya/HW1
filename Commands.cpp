@@ -17,6 +17,7 @@
 
 using namespace std;
 
+
 #if 0
 #define FUNC_ENTRY()  \
   cout << __PRETTY_FUNCTION__ << " --> " << endl;
@@ -29,6 +30,41 @@ using namespace std;
 #endif
 
 const std::string WHITESPACE = " \n\r\t\f\v";
+
+void copyArgs(const char* const* src, char** dest){
+    while(*src != nullptr){
+        int len = strlen(*src);
+        *dest = (char*) malloc(sizeof(char) * (len + 1));
+        strcpy(*dest, *src);
+        dest++;
+        src++;
+    }
+    *dest = nullptr;
+}
+
+
+Args::Args(char const* const*  args){
+    obj =  (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
+    copyArgs(args, obj);
+}
+Args::~Args(){
+    char** cur = obj;
+    while(*cur != nullptr){
+        free(*cur);
+        cur++;
+    }
+    free(*cur);
+    free(obj);
+}
+ char const * const* Args::getObj() const{
+    return obj;
+}
+
+Args::Args(const Args &args) {
+    obj =  (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
+    copyArgs(args.obj, obj);
+}
+
 
 string _ltrim(const std::string& s)
 {
@@ -207,7 +243,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
    if (firstWord.compare("chprompt") == 0) {
 
-       getInstance().jobsList.addJob(new ExternalCommand(cmd_line), false);
+       getInstance().jobsList.addJob(new CommandsPack(cmd_line), false);
        return new ChangePromptCommand(cmd_line);
      }else if (firstWord.compare("pwd") == 0) {
         return new GetCurrDirCommand(cmd_line);
@@ -216,7 +252,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
    }else if (firstWord.compare("jobs") == 0) {
         return new JobsCommand(cmd_line);
    }else{
-       return new CommandsPack(cmd_line);
+       auto command = new CommandsPack(cmd_line);
+       if (command->doesRunInBackground) {
+           jobsList.addJob(command);
+       }
+       return command;
    }
 
     // For example:
@@ -238,8 +278,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
     std::string prompt;
     int test;
     Command *cmd = CreateCommand(cmd_line);
-    if (cmd != nullptr){
-    cmd->execute();}
+    if (cmd != nullptr) {
+        cmd->execute();
+    }
 
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
@@ -258,7 +299,9 @@ void SmallShell::changePrevDir(std::string prev) {
     prevDir = new std::string(prev);
 }
 
-Command::Command(const char * cmd_line)
+
+
+Command::Command(const char* cmd_line, bool areArgsReady, Args readyArgs )
     :cmd_line(cmd_line),
      args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1)))
 
@@ -273,7 +316,11 @@ Command::Command(const char * cmd_line)
     }else{
         doesRunInBackground = false;
     }
-    _parseCommandLine(cmd_line, args);
+    if (!areArgsReady) {
+        _parseCommandLine(cmd_line, args);
+    }else{
+        copyArgs(readyArgs.getObj(), args);
+    }
 }
 
 void GetCurrDirCommand::execute() {
@@ -346,11 +393,11 @@ JobsList::JobsList()
 
 }
 
-void JobsList::addJob(ExternalCommand *cmd, bool isStopped) {
+void JobsList::addJob(CommandsPack *cmd, bool isStopped) {
     jobsList.sort();
     int newjob_id;
     int size=jobsList.size();
-    if (jobsList.empty()== true){
+    if (jobsList.empty()){
         newjob_id=1;
     }else{
         newjob_id=jobsList.back().jobId+1;
@@ -363,7 +410,7 @@ void JobsList::addJob(ExternalCommand *cmd, bool isStopped) {
 }
 
 void JobsList::printJobsList() {
-    int size=jobsList.size();
+
 
 }
 
@@ -382,7 +429,7 @@ void JobsCommand::execute() {
 
 }
 
-JobsList::JobEntry::JobEntry(ExternalCommand &command, bool isStopped, int jobId, time_t time_insert)
+JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, time_t time_insert)
                             :command(command),isStopped(isStopped),jobId(jobId),time_insert(time_insert) {
 
 }
@@ -390,9 +437,21 @@ JobsList::JobEntry::JobEntry(ExternalCommand &command, bool isStopped, int jobId
 bool JobsList::JobEntry::operator<(JobsList::JobEntry &job) const {
     return this->jobId < job.jobId;
 }
+Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
+    std::string commandArg =  std::string(cmd_line);
+    const char * args[4];
+    args[0] = "/bin/bash";
+    args[1] = "-c";
+    args[2] = commandArg.c_str();
+    args[3] = nullptr;
+    return Args(args);
 
-ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) ,pid(0){
+}
 
+ExternalCommand::ExternalCommand(const char *cmd_line)
+    :Command(cmd_line, true, getModifiedLine(cmd_line)) ,
+     pid(0)
+{
 }
 
 void ExternalCommand::execute() {
@@ -403,7 +462,7 @@ void ExternalCommand::execute() {
     execv(args[0],args);
 }
 
-CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line) {
+CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line), outFile() {
     if (!isCmdLegal()){
         //TODO
         return;
@@ -453,11 +512,11 @@ int CommandsPack::setRedirection(int curArg) {
         return curArg + 1;
     }else if (areEqual(args[curArg], ">")){
         outFileType = R_NORMAL;
-        *outFile = std::string(args[curArg + 1]);
+        outFile = std::string(args[curArg + 1]);
         return curArg + 2;
     }else if (areEqual(args[curArg], ">>")){
         outFileType = R_APPEND;
-        *outFile = std::string(args[curArg + 1]);
+        outFile = std::string(args[curArg + 1]);
         return curArg + 2;
     }
 }
@@ -467,11 +526,17 @@ int CommandsPack::addProgram(int curArg) {
     int cur = curArg;
     std::string cmd("");
     while(!endOfTextDetected(cur) && !redirectionDetected(cur)){
-        cmd += std::string(args[cur]) + std::string(" ");
+        cmd += std::string(args[cur]);
+        if (!endOfTextDetected(cur + 1) && !redirectionDetected(cur + 1)){
+            cmd += std::string(" ");
+        }
         cur++;
     }
-    programs.emplace_back(ExternalCommand(cmd.c_str()));
+    ExternalCommand command(cmd.c_str());
+    Program program(command);
+    programs.push_back(program);
     //TODO
+    return cur++;
 }
 
 void CommandsPack::execute() {
@@ -483,19 +548,27 @@ void CommandsPack::execute() {
         if (!(i->isLast())){
             curFd = new int[2];
             pipe(curFd);
+        }else{
+            curFd = nullptr;
         }
         int forkResult = fork();
         if (forkResult == 0) {
             if (!(i->isLast())) {
-                dup2(curFd[1], 1);
+                int output;
+                if (i->pipeType == P_NORMAL){
+                    output = 1;
+                }else{
+                    output = 2;
+                }
+                dup2(curFd[1], output);
                 close(curFd[0]);
                 close(curFd[1]);
-            }else if (outFileType != R_NORMAL){
-                int outFD = open(inFile->c_str(), O_WRONLY|O_CREAT|O_TRUNC); //check last
+            }else if (outFileType == R_NORMAL){
+                int outFD = open(outFile.c_str(), O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR); //check last
                 dup2(outFD, 1);
                 close(outFD);
             }else if (outFileType == R_APPEND){
-                int outFD = open(inFile->c_str(), O_WRONLY|O_CREAT|O_APPEND); //check last
+                int outFD = open(outFile.c_str(), O_WRONLY|O_CREAT|O_APPEND,S_IRUSR|S_IWUSR); //check last
                 dup2(outFD, 1);
                 close(outFD);
             }
@@ -507,7 +580,7 @@ void CommandsPack::execute() {
             i->command.execute();
             delete prevFd;
             delete curFd;
-            break;
+            return;
         }
         //save pid in command in father process
         i->command.pid = forkResult;
@@ -515,7 +588,11 @@ void CommandsPack::execute() {
         ++i;
     }
     delete curFd;
-
+    if(!doesRunInBackground){
+        for(auto i = programs.begin(); i != programs.end(); ++i){
+            waitpid(i->command.pid ,nullptr, 0);
+        }
+    }
 }
 /*
 KillCommand::KillCommand(const char *cmd_line)
@@ -556,7 +633,7 @@ void KillCommand::execute() {
     *outputStream << "signal number " << signal << " was sent to pid " << pid;
 }
 */
-CommandsPack::Program::Program(ExternalCommand commmand)
+CommandsPack::Program::Program(ExternalCommand command)
     :command(command), pipeType(P_NONE)
 {}
 

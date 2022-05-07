@@ -8,16 +8,29 @@
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 const static int FAILURE = -1;
+static const int MAX_ARGS_NUM = 21;
+
+
+class Args{
+    char** obj;
+public:
+    Args(char const* const*  args);
+    Args(const Args& args);
+    ~Args();
+    char const* const* getObj() const;
+};
+
+const static char* EMPTY_ARGS[1] = {nullptr};
+
 class Command {
 // TODO: Add your data members
-
-  const std::string cmd_line;
+    const std::string cmd_line;
 protected:
     static const int MAX_ARGS_NUM = 21;
     char** args;
-    bool doesRunInBackground;
 public:
-  Command(const char* cmd_line);
+    bool doesRunInBackground;
+  explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs =Args(EMPTY_ARGS));
   virtual ~Command(){};
 
   virtual void execute() = 0;
@@ -36,7 +49,9 @@ public:
 };
 
 class ExternalCommand : public Command {
-    public:
+private:
+    Args getModifiedLine(const char * cmd_line) const;
+public:
         pid_t pid;
         ExternalCommand(const char* cmd_line);
         virtual ~ExternalCommand() {}
@@ -57,7 +72,7 @@ private:
     std::list<Program> programs;
     std::string* inFile;
 
-    std::string* outFile;
+    std::string outFile;
     RedirectionType outFileType;
     int processesNum;
     bool isCmdLegal() const;
@@ -140,11 +155,11 @@ class JobsList {
  public:
   class JobEntry {
   public:
-      ExternalCommand& command;
+      CommandsPack& command;
       bool isStopped;
       int jobId;
       time_t time_insert;
-   JobEntry(ExternalCommand& command,bool isStopped,int jobId,time_t time_insert);
+   JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t time_insert);
    bool operator<(JobEntry& job) const;
   };
  // TODO: Add your data members
@@ -153,7 +168,7 @@ private:
 public:
    JobsList();
   ~JobsList(){};
-  void addJob(ExternalCommand* cmd, bool isStopped = false);
+  void addJob(CommandsPack* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();
