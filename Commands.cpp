@@ -248,6 +248,8 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ChangeDirCommand(cmd_line);
    }else if (firstWord.compare("jobs") == 0) {
        return new JobsCommand(cmd_line);
+   }else if (firstWord.compare("showpid") == 0){
+       return new ShowPidCommand(cmd_line);
    }else{
        return new CommandsPack(cmd_line);
    }
@@ -323,7 +325,7 @@ void GetCurrDirCommand::execute() {
 }
 
 GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line)
-    : BuiltInCommand(cmd_line)
+    :BuiltInCommand(cmd_line)
 {}
 
 std::string GetCurrDirCommand::getCurDir() {
@@ -354,6 +356,10 @@ ChangePromptCommand::ChangePromptCommand(const char *cmd_line) : BuiltInCommand(
 
 void ShowPidCommand::execute() {
     *outputStream << "smash pid is " << getpid() << std::endl;
+}
+
+ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+
 }
 
 void ChangeDirCommand::execute() {
@@ -422,6 +428,7 @@ JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 
 void JobsCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
+    smash.jobsList.removeFinishedJobs();
     std::cout << smash.jobsList;
 }
 
@@ -441,15 +448,59 @@ std::ostream &operator<<(ostream &os, const JobsList::JobEntry &entry) {
 }
 
 std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
-    os << "pid: " << cmd.getPid();
+    os << "pid: " << cmd.getPid() << "cmdLine: " << cmd.cmd_line ;
     return os;
 }
 
 std::ostream &operator<<(ostream &os, const JobsList& l) {
-    for(auto job : l.jobsList){
+    for(const JobsList::JobEntry& job : l.jobsList){
         os << job << std::endl;
     }
     return os;
+}
+
+void JobsList::killAllJobs() {
+    for(JobsList::JobEntry& job : jobsList){
+        job.command.sendSig(SIGKILL);
+    }
+    removeFinishedJobs();
+}
+
+void JobsList::removeFinishedJobs() {
+    for(auto i = jobsList.begin(); i !=jobsList.end();){
+        int status;
+        JobEntry& job = *i;
+        waitpid(job.command.getPid(), &status, WNOHANG);
+        //if process changed state
+        if (WIFEXITED(status)){
+            auto toDelete = i;
+            ++i;
+            jobsList.erase(toDelete);
+            continue;
+        }
+        ++i;
+    }
+}
+
+void JobsList::updateJobStatusAsStopped(int jobId) {
+    JobEntry* job = getJobById(jobId);
+    assert(job != nullptr);
+    job->isStopped = true;
+}
+
+void JobsList::updateJobStatusAsRunning(int jobId) {
+    JobEntry* job = getJobById(jobId);
+    assert(job != nullptr);
+    job->isStopped = false;
+}
+
+JobsList::JobEntry *JobsList::getJobById(int jobId) {
+    for(JobEntry& job : jobsList) {
+        if (job.jobId == jobId){
+            return &job;
+        }
+    }
+    return nullptr;
 }
 
 Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
@@ -611,7 +662,6 @@ bool CommandsPack::isSingleProgram() const {
 }
 
 pid_t CommandsPack::getPid() const {
-    //assert(isSingleProgram());
     return programs.front().command.pid;
 }
 

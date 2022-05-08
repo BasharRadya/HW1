@@ -11,6 +11,7 @@ void ctrlZHandler(int sig_num) {
         return;
     }
     smash.cur->sendSig(SIGSTOP);
+    smash.jobsList.addJob(smash.cur, true);
 
 }
 

@@ -22,6 +22,8 @@ public:
 
 const static char* EMPTY_ARGS[1] = {nullptr};
 
+class CommandsPack;
+
 class Command {
 // TODO: Add your data members
     const std::string cmd_line;
@@ -35,6 +37,7 @@ public:
   virtual ~Command(){};
 
   virtual void execute() = 0;
+  friend std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
@@ -188,6 +191,7 @@ public:
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
   void updateJobStatusAsStopped(int jobId);
+  void updateJobStatusAsRunning(int jobId);
   // TODO: Add extra methods or modify exisitng ones as needed
   JobEntry& operator[](int x) ;
   friend std::ostream& operator<<(std::ostream& os, const JobsList& list);
