@@ -217,7 +217,6 @@ SmallShell::SmallShell()
      jobsList(JobsList()),
      cur(nullptr),
      prevDir(nullptr)
-
 {
 
 // TODO: add your implementation
@@ -242,44 +241,39 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   char* arg1=args[0];
 
    if (firstWord.compare("chprompt") == 0) {
-
-       getInstance().jobsList.addJob(new CommandsPack(cmd_line), false);
        return new ChangePromptCommand(cmd_line);
      }else if (firstWord.compare("pwd") == 0) {
         return new GetCurrDirCommand(cmd_line);
    }else if (firstWord.compare("cd") == 0) {
         return new ChangeDirCommand(cmd_line);
    }else if (firstWord.compare("jobs") == 0) {
-        return new JobsCommand(cmd_line);
+       return new JobsCommand(cmd_line);
    }else{
-       auto command = new CommandsPack(cmd_line);
-       if (command->doesRunInBackground) {
-           jobsList.addJob(command);
-       }
-       return command;
+       return new CommandsPack(cmd_line);
    }
-
-    // For example:
-/*
-  else if (firstWord.compare("showpid") == 0) {
-    return new ShowPidCommand(cmd_line);
-  }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
-  }
-  */
-  return nullptr;
+   //return nullptr;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     std::string prompt;
-    int test;
     Command *cmd = CreateCommand(cmd_line);
     if (cmd != nullptr) {
-        cmd->execute();
+        if(!cmd->doesNeedFork){
+            cmd->execute();
+        }else if (cmd->doesRunInBackground) {
+            jobsList.addJob(dynamic_cast<CommandsPack*>(cmd));
+            cmd->execute();
+        }else{
+            CommandsPack* curCmd = dynamic_cast<CommandsPack*>(cmd);
+            cur = curCmd;
+            cmd->execute();
+            int status = curCmd->wait();
+            if (WIFSTOPPED(status)){
+                jobsList.addJob(curCmd, true);
+            }
+            cur = nullptr;
+        }
     }
 
   // Please note that you must fork smash process for some commands (e.g., external commands....)
@@ -303,7 +297,8 @@ void SmallShell::changePrevDir(std::string prev) {
 
 Command::Command(const char* cmd_line, bool areArgsReady, Args readyArgs )
     :cmd_line(cmd_line),
-     args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1)))
+     args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1))),
+     doesNeedFork(false)
 
 {
     if (_isBackgroundComamnd(cmd_line)){
@@ -426,7 +421,8 @@ JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 }
 
 void JobsCommand::execute() {
-
+    SmallShell& smash = SmallShell::getInstance();
+    std::cout << smash.jobsList;
 }
 
 JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, time_t time_insert)
@@ -437,6 +433,25 @@ JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, t
 bool JobsList::JobEntry::operator<(JobsList::JobEntry &job) const {
     return this->jobId < job.jobId;
 }
+
+std::ostream &operator<<(ostream &os, const JobsList::JobEntry &entry) {
+    os << "jobid: " << entry.jobId << " stopped:" << entry.isStopped
+            << " " << entry.command;
+    return os;
+}
+
+std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
+    os << "pid: " << cmd.getPid();
+    return os;
+}
+
+std::ostream &operator<<(ostream &os, const JobsList& l) {
+    for(auto job : l.jobsList){
+        os << job << std::endl;
+    }
+    return os;
+}
+
 Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
     std::string commandArg =  std::string(cmd_line);
     const char * args[4];
@@ -467,6 +482,7 @@ CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line), outFile() 
         //TODO
         return;
     }
+    doesNeedFork = true;
     const static int MAX_PROCESSES_NUM = 100;
     int curArg = 0;
     int curProgramIndex = 0;
@@ -588,12 +604,37 @@ void CommandsPack::execute() {
         ++i;
     }
     delete curFd;
-    if(!doesRunInBackground){
-        for(auto i = programs.begin(); i != programs.end(); ++i){
-            waitpid(i->command.pid ,nullptr, 0);
-        }
+}
+
+bool CommandsPack::isSingleProgram() const {
+    return processesNum == 1;
+}
+
+pid_t CommandsPack::getPid() const {
+    //assert(isSingleProgram());
+    return programs.front().command.pid;
+}
+
+int CommandsPack::wait() {
+    //it is assumed that the status of the processes is the same
+    int status;
+    for(auto i = programs.begin(); i != programs.end(); ++i){
+        waitpid(i->command.pid ,&status, 0);
+    }
+    return status;
+
+
+
+}
+
+void CommandsPack::sendSig(int signum){
+    for(Program& program :programs){
+        kill(program.command.pid, signum);
     }
 }
+
+
+
 /*
 KillCommand::KillCommand(const char *cmd_line)
     : BuiltInCommand(cmd_line)

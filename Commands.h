@@ -30,6 +30,7 @@ protected:
     char** args;
 public:
     bool doesRunInBackground;
+    bool doesNeedFork;
   explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs =Args(EMPTY_ARGS));
   virtual ~Command(){};
 
@@ -85,8 +86,16 @@ public:
     CommandsPack(const char* cmd_line);
     ~CommandsPack() override = default;
   void execute() override;
+
+    bool isSingleProgram() const;
+    pid_t getPid() const;
+
+    int wait();
+    void sendSig(int signum);
+    friend std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
 };
 
+    std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
 class PipeCommand : public Command {
   // TODO: Add your data members
  public:
@@ -159,8 +168,10 @@ class JobsList {
       bool isStopped;
       int jobId;
       time_t time_insert;
+
    JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t time_insert);
    bool operator<(JobEntry& job) const;
+   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
  // TODO: Add your data members
 private:
@@ -179,9 +190,13 @@ public:
   void updateJobStatusAsStopped(int jobId);
   // TODO: Add extra methods or modify exisitng ones as needed
   JobEntry& operator[](int x) ;
+  friend std::ostream& operator<<(std::ostream& os, const JobsList& list);
 
 };
 
+
+std::ostream& operator<<(std::ostream& os, const JobsList::JobEntry& job);
+std::ostream& operator<<(std::ostream& os, const JobsList& list);
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
@@ -240,7 +255,7 @@ class SmallShell {
  public:
     std::string prompt;
     JobsList jobsList;
-    ForegroundCommand* cur;
+    CommandsPack* cur;
     bool prevDirExists();
     std::string getPrevDir();
     void changePrevDir(std::string prev);

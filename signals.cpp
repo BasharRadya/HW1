@@ -6,11 +6,20 @@
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
-	// TODO: Add your implementation
+    SmallShell& smash = SmallShell::getInstance();
+    if (smash.cur == nullptr){
+        return;
+    }
+    smash.cur->sendSig(SIGSTOP);
+
 }
 
 void ctrlCHandler(int sig_num) {
-  // TODO: Add your implementation
+    SmallShell& smash = SmallShell::getInstance();
+    if (smash.cur == nullptr){
+        return;
+    }
+    smash.cur->sendSig(SIGKILL);
 }
 
 void alarmHandler(int sig_num) {
