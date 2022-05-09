@@ -12,6 +12,7 @@ void ctrlZHandler(int sig_num) {
     }
     smash.cur->sendSig(SIGSTOP);
 
+
 }
 
 void ctrlCHandler(int sig_num) {
