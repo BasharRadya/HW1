@@ -450,7 +450,6 @@ void JobsList::addJob(CommandsPack *cmd, bool isStopped) {
 
 void JobsList::printJobsList() {
 
-
 }
 
 JobsList::JobEntry &JobsList::operator[](int x)  {
