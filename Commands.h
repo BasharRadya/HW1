@@ -10,7 +10,6 @@
 const static int FAILURE = -1;
 static const int MAX_ARGS_NUM = 21;
 
-
 class Args{
     char** obj;
 public:
@@ -30,6 +29,7 @@ class Command {
 protected:
     static const int MAX_ARGS_NUM = 21;
     char** args;
+    bool redirectionDetected(int curArg) const;
 public:
     bool doesRunInBackground;
     bool doesNeedFork; //default value is false
@@ -44,12 +44,14 @@ public:
 };
 
 class BuiltInCommand : public Command {
+private:
+    void setRedirection(int curArg);
 protected:
     std::istream * inputStream;
     std::ostream * outputStream;
 public:
   BuiltInCommand(const char* cmd_line);
-  virtual ~BuiltInCommand() {}
+  virtual ~BuiltInCommand();
 };
 
 class ExternalCommand : public Command {
@@ -81,7 +83,6 @@ private:
     int processesNum;
     bool isCmdLegal() const;
     bool endOfTextDetected(int curArg) const;
-    bool redirectionDetected(int curArg) const;
     int setRedirection(int curArg);
     int addProgram(int curArg);
 public:
@@ -276,5 +277,11 @@ class SmallShell {
   void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
 };
+
+
+class SyntaxError : public std::exception{};
+class SyscallFailure : public std::exception{};
+class JobDoesntExist : public std::exception{};
+class FileError : public std::exception{};
 
 #endif //SMASH_COMMAND_H_

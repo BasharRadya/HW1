@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <cassert>
 #include <fcntl.h>
+#include <fstream>
 
 using namespace std;
 
@@ -248,8 +249,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ChangeDirCommand(cmd_line);
    }else if (firstWord.compare("jobs") == 0) {
        return new JobsCommand(cmd_line);
-   }else if (firstWord.compare("showpid") == 0){
+   }else if (firstWord.compare("showpid") == 0) {
        return new ShowPidCommand(cmd_line);
+   }else if(firstWord.compare("kill") == 0){
+       return new KillCommand(cmd_line);
    }else{
        return new CommandsPack(cmd_line);
    }
@@ -274,8 +277,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
             int status = curCmd->wait();
             if (WIFSTOPPED(status)){
                 jobsList.addJob(curCmd, true);
+            }else{
+                delete cur;
             }
-            delete cur;
             cur = nullptr;
         }
     }
@@ -340,7 +344,38 @@ std::string GetCurrDirCommand::getCurDir() {
 
 BuiltInCommand::BuiltInCommand(const char* cmd_line)
     :Command(cmd_line), inputStream(&cin), outputStream(&cout)
-{}
+{
+    for(int i = 0; args[i] != nullptr; i++){
+        if (redirectionDetected(i)){
+            setRedirection(i);
+        }
+    }
+}
+
+void BuiltInCommand::setRedirection(int curArg) {
+    fstream* outStream = new fstream();
+    const char* path = args[curArg + 1];
+    if (string(args[curArg]) == string(">")){
+        outStream->open(path, ios_base::out);
+    }else if(string(args[curArg]) == string(">>")){
+        outStream->open(path, ios_base::out | std::ios_base::app);
+    }else{
+        throw SyntaxError();
+    }
+    if ((outStream->rdstate() & std::ifstream::failbit) != 0){
+        throw FileError();
+    }else{
+        outputStream = outStream;
+    }
+
+}
+
+BuiltInCommand::~BuiltInCommand() {
+    if (outputStream != &std::cout){
+        static_cast<fstream*>(outputStream)->close();
+        delete outputStream;
+    }
+}
 
 void ChangePromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
@@ -432,7 +467,7 @@ JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 void JobsCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.jobsList.removeFinishedJobs();
-    std::cout << smash.jobsList;
+    *outputStream << smash.jobsList;
 }
 
 JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, time_t time_insert)
@@ -456,9 +491,17 @@ std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
 }
 
 std::ostream &operator<<(ostream &os, const JobsList& l) {
-    for(const JobsList::JobEntry& job : l.jobsList){
-        os << job << std::endl;
+    for (const JobsList::JobEntry& job : l.jobsList){
+        if (job.isStopped){
+            os << job << std::endl;
+        }
     }
+    for (const JobsList::JobEntry& job : l.jobsList){
+        if (!job.isStopped){
+            os << job << std::endl;
+        }
+    }
+
     return os;
 }
 
@@ -506,6 +549,10 @@ JobsList::JobEntry *JobsList::getJobById(int jobId) {
     return nullptr;
 }
 
+void JobsList::removeJobById(int jobId) {
+
+}
+
 Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
     std::string commandArg =  std::string(cmd_line);
     const char * args[4];
@@ -524,11 +571,10 @@ ExternalCommand::ExternalCommand(const char *cmd_line)
 }
 
 void ExternalCommand::execute() {
-    /*int result = setpgrp();
+    int result = setpgrp();
     if(result == FAILURE){
         //TODO
     }
-     */
     execv(args[0],args);
 
 }
@@ -568,11 +614,20 @@ bool areEqual(std::string const & string1, std::string const & string2){
     return string1 == string2;
 }
 
-bool CommandsPack::redirectionDetected(int curArg) const {
-    return (areEqual(args[curArg], ">") ||
+bool Command::redirectionDetected(int curArg) const {
+
+    bool result = (areEqual(args[curArg], ">") ||
             areEqual(args[curArg], ">>") ||
             areEqual(args[curArg], "|") ||
             areEqual(args[curArg], "&|"));
+    if (!result){
+        return false;
+    }
+    if (args[curArg + 1] == nullptr){
+        throw SyntaxError();
+    }else{
+        return true;
+    }
 }
 
 int CommandsPack::setRedirection(int curArg) {
@@ -697,7 +752,7 @@ void CommandsPack::sendSig(int signum){
 
 
 
-/*
+
 KillCommand::KillCommand(const char *cmd_line)
     : BuiltInCommand(cmd_line)
 {}
@@ -717,15 +772,16 @@ void KillCommand::execute() {
     try{
         job = smash.jobsList.getJobById(jobId);
     }catch(JobDoesntExist&){
-        *outputStream << "smash error: kill: job-id " << jobId << " does not exist" << std:endl;
+        *outputStream << "smash error: kill: job-id " << jobId << " does not exist" << std::endl;
         return;
     }
-    ExternalCommand& cmd = job->command;
-    pid_t pid = cmd.pid;
-    int signal = str2int(args[2]);
+    CommandsPack& cmd = job->command;
+    pid_t pid = cmd.getPid();
+    int signal = - str2int(args[2]);
     int result = kill(pid, signal);
-    if (result == SYSCALL_FAILURE){
+    if (result == FAILURE){
         //TODO
+        throw SyscallFailure();
     }
     if (signal == SIGSTOP){
         job->isStopped = true;
@@ -735,7 +791,7 @@ void KillCommand::execute() {
     }
     *outputStream << "signal number " << signal << " was sent to pid " << pid;
 }
-*/
+
 CommandsPack::Program::Program(ExternalCommand command)
     :command(command), pipeType(P_NONE)
 {}
