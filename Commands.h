@@ -32,7 +32,7 @@ protected:
     char** args;
 public:
     bool doesRunInBackground;
-    bool doesNeedFork;
+    bool doesNeedFork; //default value is false
   explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs =Args(EMPTY_ARGS));
   virtual ~Command(){};
 

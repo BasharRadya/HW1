@@ -261,6 +261,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     std::string prompt;
     Command *cmd = CreateCommand(cmd_line);
     if (cmd != nullptr) {
+        jobsList.removeFinishedJobs();
         if(!cmd->doesNeedFork){
             cmd->execute();
         }else if (cmd->doesRunInBackground) {
@@ -274,6 +275,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
             if (WIFSTOPPED(status)){
                 jobsList.addJob(curCmd, true);
             }
+            delete cur;
             cur = nullptr;
         }
     }
@@ -395,6 +397,7 @@ JobsList::JobsList()
 }
 
 void JobsList::addJob(CommandsPack *cmd, bool isStopped) {
+    removeFinishedJobs();
     jobsList.sort();
     int newjob_id;
     int size=jobsList.size();
@@ -470,7 +473,7 @@ void JobsList::removeFinishedJobs() {
     for(auto i = jobsList.begin(); i !=jobsList.end();){
         int status;
         JobEntry& job = *i;
-        waitpid(job.command.getPid(), &status, WNOHANG);
+        waitpid(job.command.getPid(), &status, WNOHANG); //TODO check if return value is needed
         //if process changed state
         if (WIFEXITED(status)){
             auto toDelete = i;
@@ -508,7 +511,7 @@ Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
     const char * args[4];
     args[0] = "/bin/bash";
     args[1] = "-c";
-    args[2] = commandArg.c_str();
+    args[2] = cmd_line;
     args[3] = nullptr;
     return Args(args);
 
@@ -521,11 +524,13 @@ ExternalCommand::ExternalCommand(const char *cmd_line)
 }
 
 void ExternalCommand::execute() {
-    int result = setpgrp();
+    /*int result = setpgrp();
     if(result == FAILURE){
         //TODO
     }
+     */
     execv(args[0],args);
+
 }
 
 CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line), outFile() {
@@ -649,6 +654,12 @@ void CommandsPack::execute() {
             delete curFd;
             return;
         }
+        if (prevFd != nullptr){
+            close(prevFd[0]);
+        }
+        if (curFd != nullptr){
+            close(curFd[1]);
+        }
         //save pid in command in father process
         i->command.pid = forkResult;
         delete prevFd;
@@ -662,6 +673,7 @@ bool CommandsPack::isSingleProgram() const {
 }
 
 pid_t CommandsPack::getPid() const {
+    //assert(this->isSingleProgram());
     return programs.front().command.pid;
 }
 
@@ -669,7 +681,7 @@ int CommandsPack::wait() {
     //it is assumed that the status of the processes is the same
     int status;
     for(auto i = programs.begin(); i != programs.end(); ++i){
-        waitpid(i->command.pid ,&status, 0);
+        waitpid(i->command.pid ,&status, WUNTRACED);
     }
     return status;
 
