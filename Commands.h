@@ -189,7 +189,7 @@ public:
   void addJob(CommandsPack* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
-  void removeFinishedJobs();
+  void update();
   CommandsPack& getJobCommandById(int jobId);
   void removeJobById(int jobId);
   CommandsPack& getLastJob(int* jobId);

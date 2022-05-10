@@ -268,7 +268,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     std::string prompt;
     Command *cmd = CreateCommand(cmd_line);
     if (cmd != nullptr) {
-        jobsList.removeFinishedJobs();
+        jobsList.update();
         if(!cmd->doesNeedFork){
             cmd->execute();
         }else if (cmd->doesRunInBackground) {
@@ -439,7 +439,7 @@ JobsList::JobsList()
 }
 
 void JobsList::addJob(CommandsPack *cmd, bool isStopped) {
-    removeFinishedJobs();
+    update();
     jobsList.sort();
     int newjob_id;
     int size=jobsList.size();
@@ -472,7 +472,7 @@ JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 
 void JobsCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    smash.jobsList.removeFinishedJobs();
+    smash.jobsList.update();
     *outputStream << smash.jobsList;
 }
 
@@ -515,21 +515,24 @@ void JobsList::killAllJobs() {
     for(JobsList::JobEntry& job : jobsList){
         job.command.sendSig(SIGKILL);
     }
-    removeFinishedJobs();
+    update();
 }
 
-void JobsList::removeFinishedJobs() {
+void JobsList::update() {
     for(auto i = jobsList.begin(); i !=jobsList.end();){
         int status;
         JobEntry& job = *i;
-        waitpid(job.command.getPid(), &status, WNOHANG); //TODO check if return value is needed
+        int waitResult = waitpid(job.command.getPid(), &status, WNOHANG); //TODO check if return value is needed
         //if process changed state
-        if (WIFEXITED(status)){
-            auto toDelete = i;
+        if (waitResult != 0 && (WIFEXITED(status) || WIFSIGNALED(status))){
+            /*auto toDelete = i;
             ++i;
             jobsList.erase(toDelete);
-            continue;
+            continue;*/
+            jobsList.erase(i);
+            return;
         }
+
         ++i;
     }
 }
@@ -834,18 +837,17 @@ void KillCommand::execute() {
     if (signal == SIGSTOP){
         smash.jobsList.StopJob(jobId);
         return;
-    }
-    if (signal == SIGCONT){
+    }else if (signal == SIGCONT){
         smash.jobsList.RunJob(jobId);
         return;
+    }else{
+        int result = kill(pid, signal);
+        if (result == FAILURE){
+            //TODO
+            throw SyscallFailure();
+        }
     }
-    int result = kill(pid, signal);
-    if (result == FAILURE){
-        //TODO
-        throw SyscallFailure();
-    }
-
-    *outputStream << "signal number " << signal << " was sent to pid " << pid;
+    *outputStream << "signal number " << signal << " was sent to pid " << pid << std::endl;
 }
 
 CommandsPack::Program::Program(ExternalCommand command)
