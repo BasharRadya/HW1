@@ -166,20 +166,23 @@ class QuitCommand : public BuiltInCommand {
 
 class JobsList {
  public:
-  class JobEntry {
-  public:
-      CommandsPack& command;
-      bool isStopped;
-      int jobId;
-      time_t time_insert;
-
-   JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t time_insert);
-   bool operator<(JobEntry& job) const;
-   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
-  };
  // TODO: Add your data members
 private:
+    class JobEntry {
+    public:
+        CommandsPack& command;
+        bool isStopped;
+        int jobId;
+        time_t time_insert;
+
+        JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t time_insert);
+        bool operator<(JobEntry& job) const;
+        friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
+    };
     std::list<JobEntry> jobsList;
+    JobEntry * getJobById(int jobId);
+    const JobEntry * getJobById(int jobId) const;
+
 public:
    JobsList();
   ~JobsList(){};
@@ -187,16 +190,18 @@ public:
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
+  CommandsPack& getJobCommandById(int jobId);
   void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
-  void updateJobStatusAsStopped(int jobId);
-  void updateJobStatusAsRunning(int jobId);
+  CommandsPack& getLastJob(int* jobId);
+  CommandsPack& getLastStoppedJob(int* jobId);
+  void StopJob(int jobId);
+  void RunJob(int jobId);
+  bool doesExist(int jobId) const;
+  bool isStopped(int jobId) const;
   // TODO: Add extra methods or modify exisitng ones as needed
   JobEntry& operator[](int x) ;
   friend std::ostream& operator<<(std::ostream& os, const JobsList& list);
-
+  friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 };
 
 
@@ -223,7 +228,7 @@ class KillCommand : public BuiltInCommand {
 class ForegroundCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
+  ForegroundCommand(const char* cmd_line);
   virtual ~ForegroundCommand() {}
   void execute() override;
 };
@@ -231,7 +236,7 @@ class ForegroundCommand : public BuiltInCommand {
 class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
+  BackgroundCommand(const char* cmd_line);
   virtual ~BackgroundCommand() {}
   void execute() override;
 };
@@ -257,7 +262,8 @@ class SmallShell {
   // TODO: Add your data members
   std::string* prevDir;
   SmallShell();
- public:
+
+public:
     std::string prompt;
     JobsList jobsList;
     CommandsPack* cur;
@@ -276,6 +282,7 @@ class SmallShell {
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
+    void wait();
 };
 
 
@@ -283,5 +290,7 @@ class SyntaxError : public std::exception{};
 class SyscallFailure : public std::exception{};
 class JobDoesntExist : public std::exception{};
 class FileError : public std::exception{};
+class NoJobs : public std::exception{};
+class NoStoppedJobs : public std::exception{};
 
 #endif //SMASH_COMMAND_H_

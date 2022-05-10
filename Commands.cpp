@@ -251,8 +251,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
        return new JobsCommand(cmd_line);
    }else if (firstWord.compare("showpid") == 0) {
        return new ShowPidCommand(cmd_line);
-   }else if(firstWord.compare("kill") == 0){
+   }else if(firstWord.compare("kill") == 0) {
        return new KillCommand(cmd_line);
+   }else if(firstWord.compare("bg") == 0){
+       return new BackgroundCommand(cmd_line);
+   }else if(firstWord.compare("fg") == 0){
+       return new ForegroundCommand(cmd_line);
    }else{
        return new CommandsPack(cmd_line);
    }
@@ -274,12 +278,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
             CommandsPack* curCmd = dynamic_cast<CommandsPack*>(cmd);
             cur = curCmd;
             cmd->execute();
-            int status = curCmd->wait();
-            if (WIFSTOPPED(status)){
-                jobsList.addJob(curCmd, true);
-            }else{
-                delete cur;
-            }
+            wait();
             cur = nullptr;
         }
     }
@@ -301,6 +300,14 @@ void SmallShell::changePrevDir(std::string prev) {
     prevDir = new std::string(prev);
 }
 
+void SmallShell::wait() {
+    int status = cur->wait();
+    if (WIFSTOPPED(status)){
+        jobsList.addJob(cur, true);
+    }else{
+        delete cur;
+    }
+}
 
 
 Command::Command(const char* cmd_line, bool areArgsReady, Args readyArgs )
@@ -527,20 +534,26 @@ void JobsList::removeFinishedJobs() {
     }
 }
 
-void JobsList::updateJobStatusAsStopped(int jobId) {
+void JobsList::RunJob(int jobId) {
+    JobEntry* job = getJobById(jobId);
+    assert(job != nullptr);
+    if (!job->isStopped){
+        return;
+    }else {
+        job->isStopped = false;
+        job->command.sendSig(SIGCONT);
+    }
+}
+
+void JobsList::StopJob(int jobId) {
     JobEntry* job = getJobById(jobId);
     assert(job != nullptr);
     job->isStopped = true;
+    job->command.sendSig(SIGSTOP);
 }
 
-void JobsList::updateJobStatusAsRunning(int jobId) {
-    JobEntry* job = getJobById(jobId);
-    assert(job != nullptr);
-    job->isStopped = false;
-}
-
-JobsList::JobEntry *JobsList::getJobById(int jobId) {
-    for(JobEntry& job : jobsList) {
+const JobsList::JobEntry *JobsList::getJobById(int jobId) const{
+    for(const JobEntry& job : jobsList) {
         if (job.jobId == jobId){
             return &job;
         }
@@ -548,8 +561,50 @@ JobsList::JobEntry *JobsList::getJobById(int jobId) {
     return nullptr;
 }
 
-void JobsList::removeJobById(int jobId) {
+JobsList::JobEntry *JobsList::getJobById(int jobId){
+    return const_cast<JobEntry*>
+            (const_cast<const JobsList*>(this)->getJobById(jobId));
+}
 
+void JobsList::removeJobById(int jobId) {
+    for(auto i = jobsList.begin(); i != jobsList.end(); ++i){
+        if (i->jobId == jobId){
+            jobsList.erase(i);
+            return;
+        }
+    }
+}
+
+CommandsPack&  JobsList::getLastJob(int* jobId){
+    if(jobsList.empty()){
+        throw NoJobs();
+    }else{
+        *jobId = jobsList.back().jobId;
+        return jobsList.back().command;
+    }
+}
+
+CommandsPack&  JobsList::getLastStoppedJob(int* jobId){
+    for(auto i = jobsList.rbegin(); i != jobsList.rend(); ++i){
+        if (i->isStopped){
+            *jobId = i->jobId;
+            return i->command;
+        }
+    }
+    throw NoStoppedJobs();
+}
+
+CommandsPack &JobsList::getJobCommandById(int jobId) {
+    return getJobById(jobId)->command;
+}
+
+bool JobsList::doesExist(int jobId) const {
+    return getJobById(jobId) != nullptr;
+}
+
+bool JobsList::isStopped(int jobId) const {
+    assert(doesExist(jobId));
+    return getJobById(jobId)->isStopped;
 }
 
 Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
@@ -766,28 +821,30 @@ int str2int(std::string s){
 
 void KillCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    JobsList::JobEntry* job;
+    CommandsPack* job;
     int jobId = str2int(args[1]);
     try{
-        job = smash.jobsList.getJobById(jobId);
+        job = &smash.jobsList.getJobCommandById(jobId);
     }catch(JobDoesntExist&){
         *outputStream << "smash error: kill: job-id " << jobId << " does not exist" << std::endl;
         return;
     }
-    CommandsPack& cmd = job->command;
-    pid_t pid = cmd.getPid();
+    pid_t pid = job->getPid();
     int signal = - str2int(args[2]);
+    if (signal == SIGSTOP){
+        smash.jobsList.StopJob(jobId);
+        return;
+    }
+    if (signal == SIGCONT){
+        smash.jobsList.RunJob(jobId);
+        return;
+    }
     int result = kill(pid, signal);
     if (result == FAILURE){
         //TODO
         throw SyscallFailure();
     }
-    if (signal == SIGSTOP){
-        job->isStopped = true;
-    }
-    if (signal == SIGCONT){
-        job->isStopped = false;
-    }
+
     *outputStream << "signal number " << signal << " was sent to pid " << pid;
 }
 
@@ -799,3 +856,44 @@ bool CommandsPack::Program::isLast() const {
     return pipeType == P_NONE;
 }
 
+BackgroundCommand::BackgroundCommand(const char *cmd_line)
+    :BuiltInCommand(cmd_line)
+{}
+
+void BackgroundCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    JobsList& jobsList = smash.jobsList;
+    int jobId;
+    CommandsPack* job;
+    if (args[1] == nullptr){
+        jobsList.getLastStoppedJob(&jobId);
+    }else{
+        jobId = str2int(args[1]);
+        assert(jobsList.doesExist(jobId));
+        assert(jobsList.isStopped(jobId));
+    }
+    jobsList.RunJob(jobId);
+}
+
+
+ForegroundCommand::ForegroundCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+
+}
+
+void ForegroundCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    JobsList& jobsList = smash.jobsList;
+    int jobId;
+    CommandsPack* job;
+    if (args[1] == nullptr){
+        job = &jobsList.getLastJob(&jobId);
+    }else{
+        jobId = str2int(args[1]);
+        assert(jobsList.doesExist(jobId));
+        job = &jobsList.getJobCommandById(jobId);
+    }
+    jobsList.RunJob(jobId);
+    jobsList.removeJobById(jobId);
+    smash.cur = job;
+    smash.wait();
+}
