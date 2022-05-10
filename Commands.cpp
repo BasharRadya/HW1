@@ -118,27 +118,6 @@ int _countRedirections(const char * cmd_line) {
         if (!found){
             cur++;
         }
-        /*if (isPrefixOf("|&", cur)) {
-            count++;
-            cur += 2;
-            continue;
-        }
-        if (isPrefixOf("|", cur)) {
-            count++;
-            cur++;
-            continue;
-        }
-        if (isPrefixOf(">>", cur)) {
-            count++;
-            cur += 2;
-            continue;
-        }
-        if (isPrefixOf(">", cur)) {
-            count++;
-            cur++;
-            continue;
-        }
-        cur++;*/
     }
     return  count;
 }
@@ -178,33 +157,6 @@ char* _addSpacesBeforeRedirections(const char * cmd_line){
             copiedFrom++;
             copiedTo++;
         }
-        /*if (isPrefixOf("|&", copiedFrom)){
-            writeStrWithoutTermination(" |& ", copiedTo);
-            copiedFrom += 2;
-            copiedTo += 4;
-            continue;
-        }
-        if (isPrefixOf("|", copiedFrom)){
-            writeStrWithoutTermination(" | ", copiedTo);
-            copiedFrom += 1;
-            copiedTo += 3;
-            continue;
-        }
-        if (isPrefixOf(">>", copiedFrom)){
-            writeStrWithoutTermination(" >> ", copiedTo);
-            copiedFrom += 2;
-            copiedTo += 4;
-            continue;
-        }
-        if (isPrefixOf(">", copiedFrom)){
-            writeStrWithoutTermination(" > ", copiedTo);
-            copiedFrom += 1;
-            copiedTo += 3;
-            continue;
-        }
-        *copiedTo = *copiedFrom;
-        copiedFrom++;
-        copiedTo++;*/
     }
     *copiedTo = '\0';
     return temp;
@@ -566,6 +518,7 @@ void JobsList::update() {
         JobEntry& job = *i;
         int waitResult = waitpid(job.command.getPid(), &status, WNOHANG); //TODO check if return value is needed
         //if process changed state
+
         if (waitResult == job.command.getPid() && (WIFEXITED(status) || WIFSIGNALED(status))){
             iList.push_back(i);
         }
@@ -932,6 +885,7 @@ void ForegroundCommand::execute() {
     }
     jobsList.RunJob(jobId);
     jobsList.removeJobById(jobId);
+    assert(smash.cur == nullptr);
     smash.cur = job;
     smash.wait();
 }
