@@ -98,8 +98,27 @@ bool isPrefixOf(const char* prefix, const char* str){
 int _countRedirections(const char * cmd_line) {
     const char *cur = cmd_line;
     int count = 0;
+    auto prefixList = std::list<std::string>({
+        string("|&"),
+        string("|"),
+        string(">>"),
+        string(">")
+
+    });
     while (*cur != '\0') {
-        if (isPrefixOf("|&", cur)) {
+        bool found = false;
+        for(auto prefix : prefixList){
+            if(isPrefixOf(prefix.c_str(), cur)){
+                count++;
+                cur += prefix.length() - 1;
+                found = true;
+                break;
+            }
+        }
+        if (!found){
+            cur++;
+        }
+        /*if (isPrefixOf("|&", cur)) {
             count++;
             cur += 2;
             continue;
@@ -119,7 +138,7 @@ int _countRedirections(const char * cmd_line) {
             cur++;
             continue;
         }
-        cur++;
+        cur++;*/
     }
     return  count;
 }
@@ -136,8 +155,30 @@ char* _addSpacesBeforeRedirections(const char * cmd_line){
     char* temp = (char*) malloc(sizeof(char) * (len + redirectionTimes + 1));
     const char * copiedFrom = cmd_line;
     char * copiedTo = temp;
+    auto prefixList = std::list<std::string>({
+        string("|&"),
+        string("|"),
+        string(">>"),
+        string(">")
+    });
     while(*copiedFrom != '\0'){
-        if (isPrefixOf("|&", copiedFrom)){
+        bool found = false;
+        for(const auto& prefix : prefixList){
+            if (isPrefixOf(prefix.c_str(), copiedFrom)) {
+                string replacement = " " + prefix + " ";
+                writeStrWithoutTermination(replacement.c_str(), copiedTo);
+                copiedFrom += prefix.length();
+                copiedTo += replacement.length();
+                found = true;
+                break;
+            }
+        }
+        if (!found){
+            *copiedTo = *copiedFrom;
+            copiedFrom++;
+            copiedTo++;
+        }
+        /*if (isPrefixOf("|&", copiedFrom)){
             writeStrWithoutTermination(" |& ", copiedTo);
             copiedFrom += 2;
             copiedTo += 4;
@@ -163,7 +204,7 @@ char* _addSpacesBeforeRedirections(const char * cmd_line){
         }
         *copiedTo = *copiedFrom;
         copiedFrom++;
-        copiedTo++;
+        copiedTo++;*/
     }
     *copiedTo = '\0';
     return temp;
@@ -519,21 +560,18 @@ void JobsList::killAllJobs() {
 }
 
 void JobsList::update() {
-    for(auto i = jobsList.begin(); i !=jobsList.end();){
+    auto iList = std::list<std::list<JobEntry>::iterator>();
+    for(auto i = jobsList.begin(); i != jobsList.end(); ++i){
         int status;
         JobEntry& job = *i;
         int waitResult = waitpid(job.command.getPid(), &status, WNOHANG); //TODO check if return value is needed
         //if process changed state
-        if (waitResult != 0 && (WIFEXITED(status) || WIFSIGNALED(status))){
-            /*auto toDelete = i;
-            ++i;
-            jobsList.erase(toDelete);
-            continue;*/
-            jobsList.erase(i);
-            return;
+        if (waitResult == job.command.getPid() && (WIFEXITED(status) || WIFSIGNALED(status))){
+            iList.push_back(i);
         }
-
-        ++i;
+    }
+    for(auto i : iList){
+        jobsList.erase(i);
     }
 }
 
@@ -836,10 +874,8 @@ void KillCommand::execute() {
     int signal = - str2int(args[2]);
     if (signal == SIGSTOP){
         smash.jobsList.StopJob(jobId);
-        return;
     }else if (signal == SIGCONT){
         smash.jobsList.RunJob(jobId);
-        return;
     }else{
         int result = kill(pid, signal);
         if (result == FAILURE){
