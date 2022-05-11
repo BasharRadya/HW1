@@ -39,6 +39,7 @@ public:
   explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs =Args(EMPTY_ARGS));
   virtual ~Command(){};
   virtual void execute() = 0;
+  std::string toString2() const;
   friend std::ostream& operator<<(std::ostream& os, const Command& cmd);
   //virtual void prepare();
   //virtual void cleanup();
@@ -137,7 +138,6 @@ private:
     };
     std::list<Program> programs;
     std::string* inFile;
-
     std::string outFile;
     RedirectionType outFileType;
     int processesNum;
@@ -157,6 +157,7 @@ public:
     int wait();
     void sendSig(int signum);
     std::string toString() const;
+    std::string toString2() const;
     friend std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
 };
 
@@ -217,7 +218,10 @@ class BackgroundCommand;
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
-// TODO: Add your data members public:
+
+// TODO: Add your data
+    JobsList* jobs;
+    public:
   QuitCommand(const char* cmd_line, JobsList* jobs);
   virtual ~QuitCommand() {}
   void execute() override;

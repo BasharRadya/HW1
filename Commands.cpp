@@ -245,6 +245,8 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
        return new BackgroundCommand(cmd_line);
    }else if(firstWord.compare("fg") == 0){
        return new ForegroundCommand(cmd_line);
+   }else if(firstWord.compare("quit") == 0){
+       return new QuitCommand(cmd_line,&(SmallShell::getInstance().jobsList));
    }else{
        return new ExternalCommand(cmd_line);
    }
@@ -326,7 +328,7 @@ Command::Command(const char* cmd_line, bool areArgsReady, Args readyArgs )
 }
 
 std::ostream& operator<<(std::ostream& os, const Command& cmd){
-    os << "cmdLine: " << cmd.cmd_line;
+    os << cmd.cmd_line;
 }
 
 void GetCurrDirCommand::execute() {
@@ -484,8 +486,9 @@ bool JobsList::JobEntry::operator<(JobsList::JobEntry &job) const {
 }
 
 std::ostream &operator<<(ostream &os, const JobsList::JobEntry &entry) {
-    os << "jobid: " << entry.jobId << " stopped:" << entry.isStopped
-            << " " << entry.command;
+    time_t time_print;
+    time(&time_print);
+    os << "[" << entry.jobId <<"] "<< entry.command<< " " <<difftime( time_print,entry.time_insert)<<" secs";
     return os;
 }
 
@@ -495,17 +498,15 @@ std::string JobsList::JobEntry::toString() const {
     return ss.str();
 }
 
-std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd) {
-
-    os << "pid: " << cmd.getPid() << " ";
-
+std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
+    os << *(cmd.programs.front().command) << " : " << cmd.getPid() ;
     return os;
 }
 
 std::ostream &operator<<(ostream &os, const JobsList& l) {
     for (const JobsList::JobEntry& job : l.jobsList){
         if (job.isStopped){
-            os << job << std::endl;
+            os << job <<" stopped"<< std::endl;
         }
     }
     for (const JobsList::JobEntry& job : l.jobsList){
@@ -520,6 +521,7 @@ std::ostream &operator<<(ostream &os, const JobsList& l) {
 void JobsList::killAllJobs() {
     for(JobsList::JobEntry& job : jobsList){
         job.command.sendSig(SIGKILL);
+        std::cout << job.command.toString2() <<std::endl;
     }
     update();
 }
@@ -704,6 +706,10 @@ bool Command::redirectionDetected(int curArg) const {
     }
 }
 
+std::string Command::toString2() const {
+    return cmd_line;
+}
+
 
 int CommandsPack::setRedirection(int curArg) {
     if (areEqual(args[curArg], "|")){
@@ -744,7 +750,6 @@ int CommandsPack::addProgram(int curArg) {
 
 
 void setFileAsOutput(string path, bool isAppended);
-
 
 
 void CommandsPack::execute() {
@@ -822,6 +827,10 @@ std::string CommandsPack::toString() const {
 
 CommandsPack::~CommandsPack() {
 
+}
+
+std::string CommandsPack::toString2() const {
+    return ((to_string(this->getPid())+": ") + (*(this->programs.front().command)).toString2());
 }
 
 
@@ -1136,3 +1145,19 @@ bool CommandsPack::RedirectionControl::isSettingOutPipeNeeded() {
 }
 
 
+QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs): BuiltInCommand(cmd_line),jobs(jobs) {
+
+}
+
+void QuitCommand::execute() {
+    if(args[1] != nullptr)
+    {
+     if(areEqual(args[1],"kill")){
+         jobs->killAllJobs();
+     }else{
+         throw system_error();
+     }}else{
+            *outputStream << "am here 2";
+            throw system_error();
+     }
+}
