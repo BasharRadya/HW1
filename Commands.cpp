@@ -15,6 +15,7 @@
 #include <cassert>
 #include <fcntl.h>
 #include <fstream>
+#include <cstdio>
 
 using namespace std;
 
@@ -95,22 +96,22 @@ bool isPrefixOf(const char* prefix, const char* str){
     return true;
 }
 
+auto prefixList = std::list<std::string>({
+    string("|&"),
+    string("|"),
+    string(">>"),
+    string(">")
+});
+
 int _countRedirections(const char * cmd_line) {
     const char *cur = cmd_line;
     int count = 0;
-    auto prefixList = std::list<std::string>({
-        string("|&"),
-        string("|"),
-        string(">>"),
-        string(">")
-
-    });
     while (*cur != '\0') {
         bool found = false;
         for(auto prefix : prefixList){
             if(isPrefixOf(prefix.c_str(), cur)){
                 count++;
-                cur += prefix.length() - 1;
+                cur += prefix.length();
                 found = true;
                 break;
             }
@@ -134,12 +135,6 @@ char* _addSpacesBeforeRedirections(const char * cmd_line){
     char* temp = (char*) malloc(sizeof(char) * (len + redirectionTimes + 1));
     const char * copiedFrom = cmd_line;
     char * copiedTo = temp;
-    auto prefixList = std::list<std::string>({
-        string("|&"),
-        string("|"),
-        string(">>"),
-        string(">")
-    });
     while(*copiedFrom != '\0'){
         bool found = false;
         for(const auto& prefix : prefixList){
@@ -251,7 +246,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
    }else if(firstWord.compare("fg") == 0){
        return new ForegroundCommand(cmd_line);
    }else{
-       return new CommandsPack(cmd_line);
+       return new ExternalCommand(cmd_line);
    }
    //return nullptr;
 }
@@ -259,11 +254,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     std::string prompt;
-    Command *cmd = CreateCommand(cmd_line);
+    Command *cmd = new CommandsPack(cmd_line);
     if (cmd != nullptr) {
         jobsList.update();
         if(!cmd->doesNeedFork){
             cmd->execute();
+            delete cmd;
         }else if (cmd->doesRunInBackground) {
             jobsList.addJob(dynamic_cast<CommandsPack*>(cmd));
             cmd->execute();
@@ -271,11 +267,13 @@ void SmallShell::executeCommand(const char *cmd_line) {
             CommandsPack* curCmd = dynamic_cast<CommandsPack*>(cmd);
             cur = curCmd;
             cmd->execute();
-            wait();
+            if (curCmd->doesNeedFork) {
+                wait();
+            }
             cur = nullptr;
         }
-    }
 
+    }
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -299,6 +297,7 @@ void SmallShell::wait() {
         jobsList.addJob(cur, true);
     }else{
         delete cur;
+        cur = nullptr;
     }
 }
 
@@ -326,8 +325,12 @@ Command::Command(const char* cmd_line, bool areArgsReady, Args readyArgs )
     }
 }
 
+std::ostream& operator<<(std::ostream& os, const Command& cmd){
+    os << "cmdLine: " << cmd.cmd_line;
+}
+
 void GetCurrDirCommand::execute() {
-    *outputStream << getCurDir() << std::endl;
+    (*outputStream) << string(getCurDir()) << "\n";
 }
 
 GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line)
@@ -337,43 +340,45 @@ GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line)
 std::string GetCurrDirCommand::getCurDir() {
     int size = pathconf(".", _PC_PATH_MAX);
     char curDir[size];
-    getcwd(curDir,sizeof(curDir));
-    std::string temp(curDir);
+    getcwd(curDir,sizeof(char)*size);
     return std::string(curDir);
 }
 
 BuiltInCommand::BuiltInCommand(const char* cmd_line)
-    :Command(cmd_line), inputStream(&cin), outputStream(&cout)
+    :Command(cmd_line), outputStream(new userostream(cout))
 {
-    for(int i = 0; args[i] != nullptr; i++){
-        if (redirectionDetected(i)){
-            setRedirection(i);
-        }
-    }
+
 }
 
-void BuiltInCommand::setRedirection(int curArg) {
+void BuiltInCommand::setRedirection(const std::string& file, RedirectionType type) {
     fstream* outStream = new fstream();
-    const char* path = args[curArg + 1];
-    if (string(args[curArg]) == string(">")){
-        outStream->open(path, ios_base::out);
-    }else if(string(args[curArg]) == string(">>")){
-        outStream->open(path, ios_base::out | std::ios_base::app);
+    if (type == R_NORMAL){
+        outStream->open(file.c_str(), ios_base::out);
     }else{
-        throw SyntaxError();
+        outStream->open(file.c_str(), ios_base::out | std::ios_base::app);
     }
     if ((outStream->rdstate() & std::ifstream::failbit) != 0){
         throw FileError();
     }else{
-        outputStream = outStream;
+        delete outputStream;
+        outputStream = new userostream(*outStream);
     }
-
 }
 
+
+
 BuiltInCommand::~BuiltInCommand() {
-    if (outputStream != &std::cout){
-        static_cast<fstream*>(outputStream)->close();
+    delete outputStream;
+}
+
+void BuiltInCommand::setOutPipe(userostream& os, PipeType type) {
+
+    if (type == P_NORMAL) {
         delete outputStream;
+        outputStream = &os;
+    }else{
+        delete errorStream;
+        errorStream = &os;
     }
 }
 
@@ -392,7 +397,7 @@ ChangePromptCommand::ChangePromptCommand(const char *cmd_line) : BuiltInCommand(
 {}
 
 void ShowPidCommand::execute() {
-    *outputStream << "smash pid is " << getpid() << std::endl;
+    *outputStream << "smash pid is " << to_string(getpid()) << "\n";
 }
 
 ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
@@ -417,7 +422,7 @@ void ChangeDirCommand::execute() {
             smash.changePrevDir(prevDir);
         }
     }else{
-        *outputStream << "smash error: cd: too many arguments" << std::endl;
+        *outputStream << "smash error: cd: too many arguments" << "\n";
     }
 
 }
@@ -451,13 +456,13 @@ void JobsList::addJob(CommandsPack *cmd, bool isStopped) {
 void JobsList::printJobsList() {
 
 }
-
+/*
 JobsList::JobEntry &JobsList::operator[](int x)  {
     std::list<JobEntry>::iterator it = jobsList.begin();
   // Advance the iterator by x positions,
      std::advance(it, x);
 }
-
+*/
 
 JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 
@@ -466,7 +471,7 @@ JobsCommand::JobsCommand(const char *cmdLine) : BuiltInCommand(cmdLine) {
 void JobsCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.jobsList.update();
-    *outputStream << smash.jobsList;
+    *outputStream << smash.jobsList.toString();
 }
 
 JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, time_t time_insert)
@@ -484,8 +489,16 @@ std::ostream &operator<<(ostream &os, const JobsList::JobEntry &entry) {
     return os;
 }
 
-std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
-    os << "pid: " << cmd.getPid() << "cmdLine: " << cmd.cmd_line ;
+std::string JobsList::JobEntry::toString() const {
+    stringstream ss;
+    ss << *this;
+    return ss.str();
+}
+
+std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd) {
+
+    os << "pid: " << cmd.getPid() << " ";
+
     return os;
 }
 
@@ -560,7 +573,7 @@ JobsList::JobEntry *JobsList::getJobById(int jobId){
             (const_cast<const JobsList*>(this)->getJobById(jobId));
 }
 
-void JobsList::removeJobById(int jobId) {
+void JobsList::removeJobByIdToRunInForeground(int jobId) {
     for(auto i = jobsList.begin(); i != jobsList.end(); ++i){
         if (i->jobId == jobId){
             jobsList.erase(i);
@@ -601,6 +614,12 @@ bool JobsList::isStopped(int jobId) const {
     return getJobById(jobId)->isStopped;
 }
 
+std::string JobsList::toString() const {
+    stringstream ss;
+    ss << *this;
+    return ss.str();
+}
+
 Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
     std::string commandArg =  std::string(cmd_line);
     const char * args[4];
@@ -616,6 +635,7 @@ ExternalCommand::ExternalCommand(const char *cmd_line)
     :Command(cmd_line, true, getModifiedLine(cmd_line)) ,
      pid(0)
 {
+    doesNeedFork = true;
 }
 
 void ExternalCommand::execute() {
@@ -632,7 +652,6 @@ CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line), outFile() 
         //TODO
         return;
     }
-    doesNeedFork = true;
     const static int MAX_PROCESSES_NUM = 100;
     int curArg = 0;
     int curProgramIndex = 0;
@@ -648,6 +667,13 @@ CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line), outFile() 
         curProgramIndex++;
     }
     this->processesNum = curProgramIndex;
+    doesNeedFork = false;
+    for(auto& program : programs){
+        if(program.command->doesNeedFork){
+            doesNeedFork = true;
+            break;
+        }
+    }
 }
 
 bool CommandsPack::isCmdLegal() const {
@@ -678,6 +704,7 @@ bool Command::redirectionDetected(int curArg) const {
     }
 }
 
+
 int CommandsPack::setRedirection(int curArg) {
     if (areEqual(args[curArg], "|")){
         programs.back().pipeType = P_NORMAL;
@@ -707,84 +734,201 @@ int CommandsPack::addProgram(int curArg) {
         }
         cur++;
     }
-    ExternalCommand command(cmd.c_str());
-    Program program(command);
+    Command* command = SmallShell::getInstance().CreateCommand(cmd.c_str());
+    Program program(*command);
     programs.push_back(program);
+    program.dontDestroyCommand();
     //TODO
     return cur++;
 }
 
+
+void setFileAsOutput(string path, bool isAppended);
+
+
+
 void CommandsPack::execute() {
     auto i = programs.begin();
-    int* prevFd = nullptr;
-    int* curFd = nullptr;
+    RedirectionControl control;
+    while(i != programs.end()) {
+        control.prepareFor(*i);
+        //sleep(2);
+        if (i->command->doesNeedFork){
+            ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(i->command);
+            int forkResult = fork();
+            if (forkResult == 0) {
+                control.inSon();
+                if (i->isLast()){
+                    control.setRedirectionIfNeeded(outFile, outFileType);
+                }
+                cmd.execute();
+            }else{
+                cmd.pid = forkResult;
+                control.inFather();
+            }
+        }else{
+            control.builtIn();
+            BuiltInCommand& cmd = *dynamic_cast<BuiltInCommand*>(i->command);
+            if (i->isLast()){
+                control.setRedirectionIfNeeded(outFile, outFileType);
+            }
+            cmd.execute();
+        }
+
+        ++i;
+    }
+
+}
+/*
+void CommandsPack::execute() {
+    auto i = programs.begin();
+    Pipe* prevFd = nullptr;
+    Pipe* curFd = nullptr;
     while(i != programs.end()) {
         prevFd = curFd;
         if (!(i->isLast())){
-            curFd = new int[2];
-            pipe(curFd);
+            curFd = new Pipe();
         }else{
             curFd = nullptr;
         }
-        int forkResult = fork();
-        if (forkResult == 0) {
+        if (i->command->doesNeedFork){
+            int forkResult = fork();
+            if (forkResult == 0) {
+                if (!(i->isLast())) {
+                    int output;
+                    if (i->pipeType == P_NORMAL) {
+                        output = 1;
+                    } else {
+                        output = 2;
+                    }
+                    i->command.setPipe(prevFd,curFd,i->pipeType);
+                } else if (outFileType == R_NORMAL) {
+                    setFileAsOutput(outFile.c_str(), false);
+                } else if (outFileType == R_APPEND) {
+                    setFileAsOutput(outFile.c_str(), true);
+                }
+                i->command.execute();
+                delete curFd;
+                delete prevFd;
+            }else{
+                i->command.pid = forkResult;
+                prevFd->SetToCloseOutput();
+                curFd->SetToCloseInput();
+            }
+        }else{
             if (!(i->isLast())) {
                 int output;
-                if (i->pipeType == P_NORMAL){
-                    output = 1;
-                }else{
-                    output = 2;
+                if (i->pipeType == P_NORMAL) {
+                    i->command.setOutPipe(curFd[1]);
+                } else {
+                    i->command.setErrPipe(curFd[1]);
                 }
-                dup2(curFd[1], output);
-                close(curFd[0]);
-                close(curFd[1]);
-            }else if (outFileType == R_NORMAL){
-                int outFD = open(outFile.c_str(), O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR); //check last
-                dup2(outFD, 1);
-                close(outFD);
-            }else if (outFileType == R_APPEND){
-                int outFD = open(outFile.c_str(), O_WRONLY|O_CREAT|O_APPEND,S_IRUSR|S_IWUSR); //check last
-                dup2(outFD, 1);
-                close(outFD);
+            } else if (outFileType == R_NORMAL) {
+                i->command.setRedirection(outFile.c_str(), false);
+            } else if (outFileType == R_APPEND) {
+                i->command.setRedirection(outFile.c_str(), true);
             }
-            if (prevFd != nullptr){
-                dup2(prevFd[0],0);
-                close(prevFd[0]);
-                close(prevFd[1]);
-            }
+
             i->command.execute();
-            delete prevFd;
-            delete curFd;
-            return;
         }
-        if (prevFd != nullptr){
-            close(prevFd[0]);
-        }
-        if (curFd != nullptr){
-            close(curFd[1]);
-        }
+
         //save pid in command in father process
-        i->command.pid = forkResult;
+
         delete prevFd;
         ++i;
     }
     delete curFd;
 }
 
+
+ void CommandsPack::execute() {
+    auto i = programs.begin();
+    Pipe* prevFd = nullptr;
+    Pipe* curFd = nullptr;
+    while(i != programs.end()) {
+        prevFd = curFd;
+        if (!(i->isLast())){
+            curFd = new Pipe();
+        }else{
+            curFd = nullptr;
+        }
+        if (i->command->doesNeedFork){
+            int forkResult = fork();
+            if (forkResult == 0) {
+                if (!(i->isLast())) {
+                    int output;
+                    if (i->pipeType == P_NORMAL) {
+                        output = 1;
+                    } else {
+                        output = 2;
+                    }
+                    curFd->dupOutputTo(output);
+                } else if (outFileType == R_NORMAL) {
+                    setFileAsOutput(outFile.c_str(), false);
+                } else if (outFileType == R_APPEND) {
+                    setFileAsOutput(outFile.c_str(), true);
+                }
+                if (prevFd != nullptr) {
+                    prevFd->dupInputTo(0);
+                    prevFd->SetToCloseInput();
+                    prevFd->SetToCloseOutput();
+                }
+                if (curFd != nullptr){
+                    curFd->SetToCloseInput();
+                    curFd->SetToCloseOutput();
+                }
+                i->command.execute();
+                delete curFd;
+                delete prevFd;
+            }else{
+                i->command.pid = forkResult;
+                prevFd->SetToCloseOutput();
+                curFd->SetToCloseInput();
+            }
+        }else{
+            if (!(i->isLast())) {
+                int output;
+                if (i->pipeType == P_NORMAL) {
+                    i->command.setOutPipe(curFd[1]);
+                } else {
+                    i->command.setErrPipe(curFd[1]);
+                }
+            } else if (outFileType == R_NORMAL) {
+                i->command.setRedirection(outFile.c_str(), false);
+            } else if (outFileType == R_APPEND) {
+                i->command.setRedirection(outFile.c_str(), true);
+            }
+
+            i->command.execute();
+        }
+
+        //save pid in command in father process
+
+        delete prevFd;
+        ++i;
+    }
+    delete curFd;
+}
+*/
+
 bool CommandsPack::isSingleProgram() const {
     return processesNum == 1;
 }
 
 pid_t CommandsPack::getPid() const {
-    //assert(this->isSingleProgram());
-    return programs.front().command.pid;
+    assert(this->isSingleProgram());
+    ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(programs.front().command);
+    return cmd.pid;
 }
 
 int CommandsPack::wait() {
     //it is assumed that the status of the processes is the same
     int status;
     for(auto i = programs.begin(); i != programs.end(); ++i){
-        waitpid(i->command.pid ,&status, WUNTRACED);
+        if (doesNeedFork) {
+            ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(i->command);
+            waitpid(cmd.pid, &status, WUNTRACED);
+        }
     }
     return status;
 
@@ -793,12 +937,23 @@ int CommandsPack::wait() {
 }
 
 void CommandsPack::sendSig(int signum){
-    for(Program& program :programs){
-        kill(program.command.pid, signum);
+    for(Program& program :programs) {
+        if (doesNeedFork) {
+            ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(programs.front().command);
+            kill(cmd.pid, signum);
+        }
     }
 }
 
+std::string CommandsPack::toString() const {
+    stringstream ss;
+    ss << *this;
+    return ss.str();
+}
 
+CommandsPack::~CommandsPack() {
+
+}
 
 
 KillCommand::KillCommand(const char *cmd_line)
@@ -820,7 +975,7 @@ void KillCommand::execute() {
     try{
         job = &smash.jobsList.getJobCommandById(jobId);
     }catch(JobDoesntExist&){
-        *outputStream << "smash error: kill: job-id " << jobId << " does not exist" << std::endl;
+        *outputStream << "smash error: kill: job-id " << to_string(jobId) << " does not exist" << "\n";
         return;
     }
     pid_t pid = job->getPid();
@@ -836,15 +991,25 @@ void KillCommand::execute() {
             throw SyscallFailure();
         }
     }
-    *outputStream << "signal number " << signal << " was sent to pid " << pid << std::endl;
+    *outputStream << "signal number " << to_string(signal) << " was sent to pid " << to_string(pid) << "\n";
 }
 
-CommandsPack::Program::Program(ExternalCommand command)
-    :command(command), pipeType(P_NONE)
+CommandsPack::Program::Program(Command& command)
+    :command(&command), pipeType(P_NONE), destroyCommand(true)
 {}
 
 bool CommandsPack::Program::isLast() const {
     return pipeType == P_NONE;
+}
+
+CommandsPack::Program::~Program() {
+    if (destroyCommand) {
+        delete command;
+    }
+}
+
+void CommandsPack::Program::dontDestroyCommand() {
+    destroyCommand = false;
 }
 
 BackgroundCommand::BackgroundCommand(const char *cmd_line)
@@ -884,8 +1049,224 @@ void ForegroundCommand::execute() {
         job = &jobsList.getJobCommandById(jobId);
     }
     jobsList.RunJob(jobId);
-    jobsList.removeJobById(jobId);
+    jobsList.removeJobByIdToRunInForeground(jobId);
     assert(smash.cur == nullptr);
     smash.cur = job;
     smash.wait();
 }
+
+CommandsPack::Pipe::Pipe()
+    :closeInput(false),
+     closeOutput(false)
+{
+    int pipeArr[2];
+    pipe(pipeArr);
+    inPipe = pipeArr[0];
+    outPipe = pipeArr[1];
+    //cout << "pipe created " << inPipe << "," << outPipe << "\n";
+}
+
+void CommandsPack::Pipe::dupInputTo(int fd) {
+    //cout << "pipe input connected fd:" << fd << " inpipe " << inPipe << " pid:" << getpid() << "\n";
+    dup2(inPipe, fd);
+}
+
+void CommandsPack::Pipe::dupOutputTo(int fd) {
+    //cout << "pipe output connected fd:" << fd << " outpipe " << outPipe << " pid:" << getpid() << "\n";
+    dup2(outPipe, fd);
+}
+
+userostream *CommandsPack::Pipe::GetOutputStream() {
+    return new userostream(outPipe);
+}
+
+void CommandsPack::Pipe::SetToCloseInput() {
+    closeInput = true;
+}
+
+void CommandsPack::Pipe::SetToCloseOutput() {
+    closeOutput = true;
+}
+
+void CommandsPack::Pipe::SetNotToCloseInput() {
+    closeInput = false;
+}
+
+void CommandsPack::Pipe::SetNotToCloseOutput() {
+    closeOutput = false;
+}
+
+CommandsPack::Pipe::~Pipe() {
+    if (closeInput){
+        close(inPipe);
+
+    }
+    if (closeOutput){
+        close(outPipe);
+    }
+}
+
+
+userostream &operator<<(userostream &os, const string &str) {
+    if (os.cStyleFile){
+        fprintf(os.file, "%s", str.c_str());
+        return os;
+    }else{
+        *os.stream << str;
+        return os;
+    }
+
+}
+
+userostream::userostream(int fd){
+    file = fdopen(fd, "a");
+    cStyleFile = true;
+    this->fd = fd;
+}
+
+userostream::userostream(ostream &stream) {
+    this->stream = &stream;
+    cStyleFile = false;
+}
+
+userostream::~userostream() {
+    if (cStyleFile){
+        cout << (fcntl(3, F_GETFD)) << endl;
+        cout << (fcntl(4, F_GETFD)) << endl;
+        close(fd);
+        cout << (fcntl(3, F_GETFD)) << endl;
+        cout << (fcntl(4, F_GETFD)) << endl;
+    }else{
+        if (stream != &std::cout && stream != &std::cerr){
+            dynamic_cast<fstream*>(stream)->close();
+            delete stream;
+        }
+    }
+}
+
+
+CommandsPack::RedirectionControl::RedirectionControl()
+    :prevPipe(nullptr), curPipe(nullptr)
+{}
+
+void CommandsPack::RedirectionControl::createPipeIfNeeded() {
+    delete prevPipe;
+    prevPipe = curPipe;
+    if (curProgram->isLast()){
+        curPipe = nullptr;
+    }else {
+        curPipe = new Pipe();
+    }
+}
+
+void CommandsPack::RedirectionControl::setCurProgramInPipeIfNeeded() {
+    if (!isSettingInPipeNeeded()){
+        return;
+    }
+    if (curProgram->command->doesNeedFork){
+        prevPipe->dupInputTo(0);
+    }else{
+        //do nothing
+    }
+}
+
+void CommandsPack::RedirectionControl::setCurProgramOutPipeIfNeeded() {
+    if (!isSettingOutPipeNeeded()){
+        return;
+    }
+    if (curProgram->command->doesNeedFork){
+        if (curProgram->pipeType == P_NORMAL) {
+            curPipe->dupOutputTo(1);
+        }else if (curProgram->pipeType == P_ERR){
+            curPipe->dupOutputTo(1);
+        }
+    }else{
+        BuiltInCommand& cmd = *dynamic_cast<BuiltInCommand*>(curProgram->command);
+        cmd.setOutPipe(*curPipe->GetOutputStream(), curProgram->pipeType);
+    }
+}
+
+CommandsPack::RedirectionControl::~RedirectionControl() {
+    delete curPipe;
+    delete prevPipe;
+}
+
+void CommandsPack::RedirectionControl::prepareFor(CommandsPack::Program &program) {
+    curProgram = &program;
+    createPipeIfNeeded();
+}
+
+void CommandsPack::RedirectionControl::setPipingIfNeeded() {
+    if (prevPipe != nullptr){
+        setCurProgramInPipeIfNeeded();
+    }
+    if(curProgram->pipeType != P_NONE){
+        setCurProgramOutPipeIfNeeded();
+    }
+}
+
+void CommandsPack::RedirectionControl::setRedirectionIfNeeded(const string &outFile,
+                                                              RedirectionType type) {
+    assert(curProgram->isLast());
+    if (type == R_NONE){
+        return;
+    }
+    if (curProgram->command->doesNeedFork){
+        if (type == R_NORMAL){
+            int outFD = open(outFile.c_str(), O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR); //check last
+            dup2(outFD, 1);
+            close(outFD);
+        }else if (type == R_APPEND){
+            int outFD = open(outFile.c_str(), O_WRONLY|O_CREAT|O_APPEND,S_IRUSR|S_IWUSR); //check last
+            dup2(outFD, 1);
+            close(outFD);
+        }
+    }else{
+        BuiltInCommand& cmd = *dynamic_cast<BuiltInCommand*>(curProgram->command);
+        cmd.setRedirection(outFile, type);
+    }
+}
+
+void CommandsPack::RedirectionControl::inFather() {
+    cleanupCurProgramPipe();
+}
+
+void CommandsPack::RedirectionControl::inSon() {
+    setPipingIfNeeded();
+    cleanupCurProgramPipe();
+}
+
+void CommandsPack::RedirectionControl::cleanupCurProgramPipe() {
+    if (isSettingInPipeNeeded()) {
+        prevPipe->SetToCloseInput();
+    }
+    if (isSettingOutPipeNeeded()) {
+        curPipe->SetToCloseOutput();
+    }
+}
+
+void CommandsPack::RedirectionControl::dontCleanupCurProgramPipe() {
+    if (isSettingInPipeNeeded()) {
+        //prevPipe->SetToCloseInput();
+        prevPipe->SetToCloseInput();
+        //go here 2
+    }
+    if (isSettingOutPipeNeeded()) {
+        curPipe->SetNotToCloseOutput();
+    }
+}
+
+void CommandsPack::RedirectionControl::builtIn() {
+    setPipingIfNeeded();
+    dontCleanupCurProgramPipe();
+}
+
+bool CommandsPack::RedirectionControl::isSettingInPipeNeeded() {
+    return prevPipe != nullptr;
+}
+
+bool CommandsPack::RedirectionControl::isSettingOutPipeNeeded() {
+    return curPipe != nullptr;
+}
+
+

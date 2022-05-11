@@ -10,6 +10,9 @@
 const static int FAILURE = -1;
 static const int MAX_ARGS_NUM = 21;
 
+enum RedirectionType{R_NONE, R_NORMAL, R_APPEND};
+enum PipeType{P_NONE, P_NORMAL, P_ERR};
+
 class Args{
     char** obj;
 public:
@@ -35,23 +38,39 @@ public:
     bool doesNeedFork; //default value is false
   explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs =Args(EMPTY_ARGS));
   virtual ~Command(){};
-
   virtual void execute() = 0;
-  friend std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
+  friend std::ostream& operator<<(std::ostream& os, const Command& cmd);
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
 };
+std::ostream& operator<<(std::ostream& os, const Command& cmd);
+
+class userostream{
+private:
+    FILE* file;
+    int fd;
+    std::ostream* stream;
+    bool cStyleFile;
+public:
+    explicit userostream(int fd);
+    explicit userostream(std::ostream& stream);
+    ~userostream();
+    friend userostream& operator<<(userostream& os, const std::string& string);
+};
+userostream& operator<<(userostream& os, const std::string& str);
+
 
 class BuiltInCommand : public Command {
-private:
-    void setRedirection(int curArg);
+
 protected:
-    std::istream * inputStream;
-    std::ostream * outputStream;
+    userostream * outputStream;
+    userostream * errorStream;
 public:
   BuiltInCommand(const char* cmd_line);
   virtual ~BuiltInCommand();
+  void setRedirection(const std::string& file, RedirectionType type);
+  void setOutPipe(userostream& os, PipeType type);
 };
 
 class ExternalCommand : public Command {
@@ -62,18 +81,60 @@ public:
         ExternalCommand(const char* cmd_line);
         virtual ~ExternalCommand() {}
         void execute() override;
-    };
+};
+
 
 class CommandsPack : public Command {
 private:
-    enum RedirectionType{R_NONE, R_NORMAL, R_APPEND};
-    enum PipeType{P_NONE, P_NORMAL, P_ERR};
     class Program{
     public:
-        ExternalCommand command;
+        Command* command;
         PipeType pipeType;
-        Program(ExternalCommand commmand);
+        bool destroyCommand;
+        Program(Command& commmand);
+        void dontDestroyCommand();
+        ~Program();
         bool isLast() const;
+    };
+    class Pipe{
+    private:
+        int inPipe;
+        int outPipe;
+        bool closeInput;
+        bool closeOutput;
+    public:
+        Pipe();
+        ~Pipe();
+        void dupInputTo(int fd);
+        void dupOutputTo(int fd);
+        userostream* GetOutputStream();
+        void SetToCloseInput();
+        void SetToCloseOutput();
+        void SetNotToCloseInput();
+        void SetNotToCloseOutput();
+    };
+
+    class RedirectionControl{
+        Program* curProgram;
+        Pipe* curPipe;
+        Pipe* prevPipe;
+        void createPipeIfNeeded();
+        void cleanup();
+        void setCurProgramInPipeIfNeeded();
+        void setCurProgramOutPipeIfNeeded();
+        void setPipingIfNeeded();
+        void cleanupCurProgramPipe();
+        void dontCleanupCurProgramPipe();
+        bool isSettingInPipeNeeded();
+        bool isSettingOutPipeNeeded();
+    public:
+        RedirectionControl();
+        ~RedirectionControl();
+        void prepareFor(Program& program);
+        void setRedirectionIfNeeded(const std::string& outFile, RedirectionType type);
+        void inFather();
+        void inSon();
+        void builtIn();
     };
     std::list<Program> programs;
     std::string* inFile;
@@ -88,7 +149,7 @@ private:
 public:
 
     CommandsPack(const char* cmd_line);
-    ~CommandsPack() override = default;
+    ~CommandsPack() override;
   void execute() override;
 
     bool isSingleProgram() const;
@@ -96,10 +157,12 @@ public:
 
     int wait();
     void sendSig(int signum);
+    std::string toString() const;
     friend std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
 };
 
-    std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
+std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
+
 class PipeCommand : public Command {
   // TODO: Add your data members
  public:
@@ -178,6 +241,7 @@ private:
         JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t time_insert);
         bool operator<(JobEntry& job) const;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
+        std::string toString() const;
     };
     std::list<JobEntry> jobsList;
     JobEntry * getJobById(int jobId);
@@ -191,7 +255,7 @@ public:
   void killAllJobs();
   void update();
   CommandsPack& getJobCommandById(int jobId);
-  void removeJobById(int jobId);
+  void removeJobByIdToRunInForeground(int jobId);
   CommandsPack& getLastJob(int* jobId);
   CommandsPack& getLastStoppedJob(int* jobId);
   void StopJob(int jobId);
@@ -199,7 +263,8 @@ public:
   bool doesExist(int jobId) const;
   bool isStopped(int jobId) const;
   // TODO: Add extra methods or modify exisitng ones as needed
-  JobEntry& operator[](int x) ;
+  //JobEntry& operator[](int x) ;
+    std::string toString() const;
   friend std::ostream& operator<<(std::ostream& os, const JobsList& list);
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 };
