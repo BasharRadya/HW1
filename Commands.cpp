@@ -794,7 +794,7 @@ int CommandsPack::wait() {
     //it is assumed that the status of the processes is the same
     int status;
     for(auto i = programs.begin(); i != programs.end(); ++i){
-        if (doesNeedFork) {
+        if (i->command->doesNeedFork) {
             ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(i->command);
             waitpid(cmd.pid, &status, WUNTRACED);
         }
@@ -946,7 +946,9 @@ void CommandsPack::Pipe::dupOutputTo(int fd) {
 }
 
 userostream *CommandsPack::Pipe::GetOutputStream() {
+    //cout << "pipe output connected pipe:" << outPipe << endl;
     return new userostream(outPipe);
+
 }
 
 void CommandsPack::Pipe::SetToCloseInput() {
@@ -978,7 +980,7 @@ CommandsPack::Pipe::~Pipe() {
 
 userostream &operator<<(userostream &os, const string &str) {
     if (os.cStyleFile){
-        fprintf(os.file, "%s", str.c_str());
+        write(os.fd, str.c_str(), str.length());
         return os;
     }else{
         *os.stream << str;
@@ -988,7 +990,7 @@ userostream &operator<<(userostream &os, const string &str) {
 }
 
 userostream::userostream(int fd){
-    file = fdopen(fd, "a");
+    //file = fdopen(fd, "a");
     cStyleFile = true;
     this->fd = fd;
 }
@@ -1000,11 +1002,7 @@ userostream::userostream(ostream &stream) {
 
 userostream::~userostream() {
     if (cStyleFile){
-        cout << (fcntl(3, F_GETFD)) << endl;
-        cout << (fcntl(4, F_GETFD)) << endl;
         close(fd);
-        cout << (fcntl(3, F_GETFD)) << endl;
-        cout << (fcntl(4, F_GETFD)) << endl;
     }else{
         if (stream != &std::cout && stream != &std::cerr){
             dynamic_cast<fstream*>(stream)->close();

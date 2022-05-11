@@ -48,7 +48,6 @@ std::ostream& operator<<(std::ostream& os, const Command& cmd);
 
 class userostream{
 private:
-    FILE* file;
     int fd;
     std::ostream* stream;
     bool cStyleFile;
