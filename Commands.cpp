@@ -1229,27 +1229,74 @@ void TouchCommand::execute() {
 
 class fileReader{
 private:
+    enum BufferExtractionType{B_NL_REACHED, B_BUFFER_ENDED, B_EOF_REACHED};
     bool readBefore;
     int fd;
-    bool eofReached;
+    bool eofReachedInBuffer;
+    bool noMoreLines;
     const static int BUFFER_SIZE = 10;
     char buffer[BUFFER_SIZE];
     int bufferCurIndex;
     int bufferSizeAfterEof;
+    int getBufferEnd() const{
+        if (eofReachedInBuffer){
+            return bufferSizeAfterEof - 1;
+        }else{
+            return BUFFER_SIZE - 1;
+        }
+    }
+    bool isInBufferBoundaries(int i) const{
+        return (i < BUFFER_SIZE && !eofReachedInBuffer) ||
+               (i < bufferSizeAfterEof && eofReachedInBuffer);
+    }
+    const static int NL_NOT_FOUND_IN_BUFFER = -1;
     int getNextNewLineIndexInBuffer() const{
         int i = bufferCurIndex;
-        while((i < BUFFER_SIZE && !eofReached) || (i < bufferSizeAfterEof && eofReached)){
+        while(isInBufferBoundaries(i)){
             if (buffer[i] =='\n'){
                 return i;
             }
             ++i;
         }
-        return NOT_FOUND;
+        return NL_NOT_FOUND_IN_BUFFER;
     }
-    string getSubStringFromBuffer(int start, int end){
-        return string(buffer + start, end - start + 1);
+    std::string getSubStringFromBuffer(int start, int end){
+        return std::string(buffer + start, end - start + 1);
     }
-    const static int NOT_FOUND = -1;
+    BufferExtractionType getNextSegmentFromBuffer(std::string& str){
+        if (bufferCurIndex >= BUFFER_SIZE) {
+            assert(!eofReachedInBuffer);
+            str = "";
+            return B_BUFFER_ENDED;
+        }
+        int start = bufferCurIndex;
+        int end;
+        BufferExtractionType returnVal;
+        int nextLineIndex = getNextNewLineIndexInBuffer();
+        if (nextLineIndex == NL_NOT_FOUND_IN_BUFFER) {
+            end = getBufferEnd();
+            if(eofReachedInBuffer){
+                returnVal = B_EOF_REACHED;
+            }else{
+                returnVal = B_BUFFER_ENDED;
+            }
+        }else{
+            end = nextLineIndex - 1;
+            bufferCurIndex = nextLineIndex + 1;
+            returnVal = B_NL_REACHED;
+        }
+        int size = end - start + 1;
+        str = std::string(buffer + start, size);
+        return returnVal;
+    }
+    void readToBuffer(){
+        bufferCurIndex = 0;
+        int numOfCharsRead = read(fd, buffer, BUFFER_SIZE);
+        if (numOfCharsRead < BUFFER_SIZE) {
+            eofReachedInBuffer = true;
+            bufferSizeAfterEof = numOfCharsRead;
+        }
+    }
 public:
     class EOFReached : public std::exception{};
     explicit fileReader(const string& path){
@@ -1257,46 +1304,28 @@ public:
         if (fd < 0){
             throw FileError();
         }
-        readBefore = false;
-        eofReached = false;
+        eofReachedInBuffer = false;
+        noMoreLines = false;
+        readToBuffer();
     }
-    string getNextLine() {
-        if (eofReached && bufferCurIndex >= bufferSizeAfterEof) {
+    std::string getNextLine() {
+        if (noMoreLines) {
             throw EOFReached();
         }
         string curLine;
-
-        int newLineIndex;
-        bool needToRead = false;
-        do {
-            int numOfCharsRead;
-            if (needToRead || !readBefore) {
-                readBefore = true;
-                bufferCurIndex = 0;
-                numOfCharsRead = read(fd, buffer, BUFFER_SIZE);
-                if (numOfCharsRead < BUFFER_SIZE) {
-                    eofReached = true;
-                    bufferSizeAfterEof = numOfCharsRead;
-                }
+        while(true) {
+            std::string temp;
+            BufferExtractionType type = getNextSegmentFromBuffer(temp);
+            curLine += temp;
+            if (type == B_NL_REACHED) {
+                return curLine;
+            } else if (type == B_BUFFER_ENDED){
+                readToBuffer();
+            } else if (type == B_EOF_REACHED){
+                noMoreLines = true;
+                return curLine;
             }
-            needToRead = true;
-            int end;
-            newLineIndex = getNextNewLineIndexInBuffer();
-            if (newLineIndex == NOT_FOUND) {
-                if (eofReached) {
-                    end = bufferSizeAfterEof - 1;
-                } else {
-                    end = BUFFER_SIZE - 1;
-                }
-            } else {
-                end = newLineIndex - 1;
-            }
-            curLine += getSubStringFromBuffer(bufferCurIndex, end);
-            bufferCurIndex = newLineIndex + 1;
-            if(newLineIndex == BUFFER_SIZE){
-                readBefore = false;
-            }
-        } while (newLineIndex == NOT_FOUND && !eofReached);
+        }
         return curLine;
     }
 };
@@ -1304,10 +1333,18 @@ public:
 template<class T>
 class CircularBuffer{
 private:
+
     T** array;
     int size;
     bool isFull;
     int nextAddingPosition;
+    int getNextIndex(int i){
+        return (i + 1) % size;
+    }
+    int getPrevIndex(int i){
+        return (i - 1) % size;
+    }
+
 public:
     CircularBuffer(int n)
     :isFull(false), nextAddingPosition(0), size(n)
@@ -1315,25 +1352,14 @@ public:
         array = new T*[n];
     }
     ~CircularBuffer(){
-        if (!isFull && nextAddingPosition == 0){
-            delete array;
-            return;
-        }
-        int start;
-        int end = end = (nextAddingPosition - 1) % size;
-        if (isFull){
-            start = nextAddingPosition;
-
+        int end;
+        if (!isFull){
+            end = nextAddingPosition - 1;
         }else{
-            start = 0;
+            end = size - 1;
         }
-        int i = start;
-        while(true){
+        for(int i = 0; i <= end; i++){
             delete array[i];
-            if (i == end){
-                break;
-            }
-            i = (i + 1) % size;
         }
         delete array;
     }
@@ -1355,7 +1381,7 @@ public:
             return list;
         }
         int start;
-        int end = end = (nextAddingPosition - 1) % size;
+        int end = getPrevIndex(nextAddingPosition);
         if (isFull){
             start = nextAddingPosition;
 
@@ -1368,7 +1394,7 @@ public:
             if (i == end){
                 break;
             }
-            i = (i + 1) % size;
+            i = getNextIndex(i);
         }
         return list;
     }
