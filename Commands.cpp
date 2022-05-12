@@ -219,7 +219,7 @@ SmallShell::~SmallShell() {
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
-Command * SmallShell::CreateCommand(const char* cmd_line) {
+Command * CommandsPack::CreateCommand(const char* cmd_line){
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
@@ -247,6 +247,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
    }else if(firstWord.compare("fg") == 0){
        return new ForegroundCommand(cmd_line);
    }else if(firstWord.compare("quit") == 0){
+       quitExists = true;
        return new QuitCommand(cmd_line,&(SmallShell::getInstance().jobsList));
    }else if(firstWord.compare("touch") == 0){
         return new TouchCommand(cmd_line);
@@ -259,11 +260,13 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     std::string prompt;
-    Command *cmd = new CommandsPack(cmd_line);
+    CommandsPack *cmd = new CommandsPack(cmd_line);
+    bool quitDone;
     if (cmd != nullptr) {
         jobsList.update();
         if(!cmd->doesNeedFork){
             cmd->execute();
+            quitDone = cmd->quitDone();
             delete cmd;
         }else if (cmd->doesRunInBackground) {
             jobsList.addJob(dynamic_cast<CommandsPack*>(cmd));
@@ -276,6 +279,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
                 wait();
             }
             cur = nullptr;
+        }
+        if (quitDone){
+            throw ProgramEnded();
         }
 
     }
@@ -301,8 +307,12 @@ void SmallShell::wait() {
     if (WIFSTOPPED(status)){
         jobsList.addJob(cur, true);
     }else{
+        bool quitDone = cur->quitDone();
         delete cur;
         cur = nullptr;
+        if (quitDone){
+            throw ProgramEnded();
+        }
     }
 }
 
@@ -501,6 +511,14 @@ std::string JobsList::JobEntry::toString() const {
     return ss.str();
 }
 
+std::string JobsList::toString2() const {
+    string str;
+    for(const JobsList::JobEntry& job : jobsList){
+        str += job.command.toString2() + "\n";
+    }
+    return str;
+}
+
 std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
     os << *(cmd.programs.front().command) << " : " << cmd.getPid() ;
     return os;
@@ -524,7 +542,7 @@ std::ostream &operator<<(ostream &os, const JobsList& l) {
 void JobsList::killAllJobs() {
     for(JobsList::JobEntry& job : jobsList){
         job.command.sendSig(SIGKILL);
-        std::cout << job.command.toString2() <<std::endl;
+
     }
     update();
 }
@@ -652,7 +670,9 @@ void ExternalCommand::execute() {
 
 }
 
-CommandsPack::CommandsPack(const char *cmd_line) : Command(cmd_line), outFile() {
+CommandsPack::CommandsPack(const char *cmd_line)
+: Command(cmd_line), outFile(), quitExists(false), outFileType(R_NONE)
+{
     if (!isCmdLegal()){
         //TODO
         return;
@@ -743,7 +763,7 @@ int CommandsPack::addProgram(int curArg) {
         }
         cur++;
     }
-    Command* command = SmallShell::getInstance().CreateCommand(cmd.c_str());
+    Command* command = CreateCommand(cmd.c_str());
     Program program(*command);
     programs.push_back(program);
     program.dontDestroyCommand();
@@ -793,18 +813,38 @@ bool CommandsPack::isSingleProgram() const {
 }
 
 pid_t CommandsPack::getPid() const {
-    assert(this->isSingleProgram());
-    ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(programs.front().command);
-    return cmd.pid;
+    //assert(this->isSingleProgram());
+    for(auto& program : programs){
+        if (program.command->doesNeedFork){
+            ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(program.command);
+            return cmd.pid;
+        }
+    }
+    throw NoForkNeededInPack();
 }
 
 int CommandsPack::wait() {
     //it is assumed that the status of the processes is the same
     int status;
+    int curStatus;
+    bool oneProgramHalted = false;
     for(auto i = programs.begin(); i != programs.end(); ++i){
-        if (i->command->doesNeedFork) {
+        if (i->command->doesNeedFork && (!i->terminated)) {
             ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(i->command);
-            waitpid(cmd.pid, &status, WUNTRACED);
+            int waitResult = waitpid(cmd.pid, &curStatus, WUNTRACED);
+            if (waitResult == cmd.pid && (WIFEXITED(curStatus) || WIFSIGNALED(curStatus))){
+                i->terminated = true;
+                //cout << "program terminated\n";
+                if (!oneProgramHalted){
+                    status = curStatus;
+
+                }
+            }else if (waitResult == cmd.pid && WIFSTOPPED(curStatus)){ //program halted
+                //cout << "program halted\n";
+                status = curStatus;
+                oneProgramHalted = true;
+            }
+
         }
     }
     return status;
@@ -815,8 +855,9 @@ int CommandsPack::wait() {
 
 void CommandsPack::sendSig(int signum){
     for(Program& program :programs) {
-        if (doesNeedFork) {
-            ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(programs.front().command);
+        if (program.command->doesNeedFork && !program.terminated) {
+            //cout << "sent sig:" << signum << "\n";
+            ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(program.command);
             kill(cmd.pid, signum);
         }
     }
@@ -833,7 +874,16 @@ CommandsPack::~CommandsPack() {
 }
 
 std::string CommandsPack::toString2() const {
-    return ((to_string(this->getPid())+": ") + (*(this->programs.front().command)).toString2());
+    return ((to_string(this->getPid())+": ") + static_cast<const Command*>(this)->toString2());
+}
+
+bool CommandsPack::quitDone() const{
+    for(const auto& program: programs){
+        if (program.command->doesNeedFork) {
+            assert(program.terminated);
+        }
+    }
+    return quitExists;
 }
 
 
@@ -876,7 +926,7 @@ void KillCommand::execute() {
 }
 
 CommandsPack::Program::Program(Command& command)
-    :command(&command), pipeType(P_NONE), destroyCommand(true)
+    :command(&command), pipeType(P_NONE), destroyCommand(true), terminated(false)
 {}
 
 bool CommandsPack::Program::isLast() const {
@@ -1153,16 +1203,10 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs): BuiltInCommand(c
 }
 
 void QuitCommand::execute() {
-    if(args[1] != nullptr)
-    {
-     if(areEqual(args[1],"kill")){
-         jobs->killAllJobs();
-     }else{
-         throw system_error();
-     }}else{
-            *outputStream << "am here 2";
-            throw system_error();
-     }
+    if(args[1] != nullptr && areEqual(args[1],"kill")){
+        *outputStream << SmallShell::getInstance().jobsList.toString2();
+        jobs->killAllJobs();
+    }
 }
 
 TouchCommand::TouchCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {

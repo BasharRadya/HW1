@@ -91,6 +91,7 @@ private:
         Command* command;
         PipeType pipeType;
         bool destroyCommand;
+        bool terminated;
         Program(Command& commmand);
         void dontDestroyCommand();
         ~Program();
@@ -119,7 +120,6 @@ private:
         Pipe* curPipe;
         Pipe* prevPipe;
         void createPipeIfNeeded();
-        void cleanup();
         void setCurProgramInPipeIfNeeded();
         void setCurProgramOutPipeIfNeeded();
         void setPipingIfNeeded();
@@ -141,6 +141,8 @@ private:
     std::string outFile;
     RedirectionType outFileType;
     int processesNum;
+    bool quitExists;
+    Command * CreateCommand(const char* cmd_line);
     bool isCmdLegal() const;
     bool endOfTextDetected(int curArg) const;
     int setRedirection(int curArg);
@@ -156,8 +158,10 @@ public:
 
     int wait();
     void sendSig(int signum);
+    bool quitDone() const;
     std::string toString() const;
     std::string toString2() const;
+
     friend std::ostream &operator<<(std::ostream &os, const CommandsPack &cmd);
 };
 
@@ -222,7 +226,7 @@ class QuitCommand : public BuiltInCommand {
 // TODO: Add your data
     JobsList* jobs;
     public:
-  QuitCommand(const char* cmd_line, JobsList* jobs);
+    QuitCommand(const char* cmd_line, JobsList* jobs);
   virtual ~QuitCommand() {}
   void execute() override;
 };
@@ -245,6 +249,7 @@ private:
         bool operator<(JobEntry& job) const;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
         std::string toString() const;
+
     };
     std::list<JobEntry> jobsList;
     JobEntry * getJobById(int jobId);
@@ -265,6 +270,7 @@ public:
   void RunJob(int jobId);
   bool doesExist(int jobId) const;
   bool isStopped(int jobId) const;
+  std::string toString2() const;
   // TODO: Add extra methods or modify exisitng ones as needed
   //JobEntry& operator[](int x) ;
     std::string toString() const;
@@ -338,7 +344,6 @@ public:
     bool prevDirExists();
     std::string getPrevDir();
     void changePrevDir(std::string prev);
-  Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
   static SmallShell& getInstance() // make SmallShell singleton
@@ -360,5 +365,6 @@ class JobDoesntExist : public std::exception{};
 class FileError : public std::exception{};
 class NoJobs : public std::exception{};
 class NoStoppedJobs : public std::exception{};
-
+class ProgramEnded : public std::exception{};
+class NoForkNeededInPack : public std::exception{};
 #endif //SMASH_COMMAND_H_
