@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include <cstdio>
+#include <iomanip>
 
 using namespace std;
 
@@ -247,7 +248,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
        return new ForegroundCommand(cmd_line);
    }else if(firstWord.compare("quit") == 0){
        return new QuitCommand(cmd_line,&(SmallShell::getInstance().jobsList));
-   }else{
+   }else if(firstWord.compare("touch") == 0){
+        return new TouchCommand(cmd_line);
+    }else{
        return new ExternalCommand(cmd_line);
    }
    //return nullptr;
@@ -1160,4 +1163,20 @@ void QuitCommand::execute() {
             *outputStream << "am here 2";
             throw system_error();
      }
+}
+
+TouchCommand::TouchCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+
+}
+
+void TouchCommand::execute() {
+    struct tm d1 = {0};
+    std::get_time(&d1,args[1]);
+    (*outputStream) <<  to_string(d1.tm_sec);
+
+    /* struct tm d1 = {0};
+    d1.tm_sec
+    struct utimbuf newtime;
+    newtime. */
+
 }
