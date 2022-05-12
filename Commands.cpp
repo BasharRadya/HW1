@@ -249,9 +249,11 @@ Command * CommandsPack::CreateCommand(const char* cmd_line){
    }else if(firstWord.compare("quit") == 0){
        quitExists = true;
        return new QuitCommand(cmd_line,&(SmallShell::getInstance().jobsList));
-   }else if(firstWord.compare("touch") == 0){
-        return new TouchCommand(cmd_line);
-    }else{
+   }else if(firstWord.compare("touch") == 0) {
+       return new TouchCommand(cmd_line);
+   }else if(firstWord.compare("tail") == 0){
+       return new TailCommand(cmd_line);
+   }else{
        return new ExternalCommand(cmd_line);
    }
    //return nullptr;
@@ -1222,5 +1224,185 @@ void TouchCommand::execute() {
     d1.tm_sec
     struct utimbuf newtime;
     newtime. */
+
+}
+
+class fileReader{
+private:
+    bool readBefore;
+    int fd;
+    bool eofReached;
+    const static int BUFFER_SIZE = 10;
+    char buffer[BUFFER_SIZE];
+    int bufferCurIndex;
+    int bufferSizeAfterEof;
+    int getNextNewLineIndexInBuffer() const{
+        int i = bufferCurIndex;
+        while((i < BUFFER_SIZE && !eofReached) || (i < bufferSizeAfterEof && eofReached)){
+            if (buffer[i] =='\n'){
+                return i;
+            }
+            ++i;
+        }
+        return NOT_FOUND;
+    }
+    string getSubStringFromBuffer(int start, int end){
+        return string(buffer + start, end - start + 1);
+    }
+    const static int NOT_FOUND = -1;
+public:
+    class EOFReached : public std::exception{};
+    explicit fileReader(const string& path){
+        fd = open(path.c_str(), O_RDONLY);
+        if (fd < 0){
+            throw FileError();
+        }
+        readBefore = false;
+        eofReached = false;
+    }
+    string getNextLine() {
+        if (eofReached && bufferCurIndex >= bufferSizeAfterEof) {
+            throw EOFReached();
+        }
+        string curLine;
+
+        int newLineIndex;
+        bool needToRead = false;
+        do {
+            int numOfCharsRead;
+            if (needToRead || !readBefore) {
+                readBefore = true;
+                bufferCurIndex = 0;
+                numOfCharsRead = read(fd, buffer, BUFFER_SIZE);
+                if (numOfCharsRead < BUFFER_SIZE) {
+                    eofReached = true;
+                    bufferSizeAfterEof = numOfCharsRead;
+                }
+            }
+            needToRead = true;
+            int end;
+            newLineIndex = getNextNewLineIndexInBuffer();
+            if (newLineIndex == NOT_FOUND) {
+                if (eofReached) {
+                    end = bufferSizeAfterEof - 1;
+                } else {
+                    end = BUFFER_SIZE - 1;
+                }
+            } else {
+                end = newLineIndex - 1;
+            }
+            curLine += getSubStringFromBuffer(bufferCurIndex, end);
+            bufferCurIndex = newLineIndex + 1;
+            if(newLineIndex == BUFFER_SIZE){
+                readBefore = false;
+            }
+        } while (newLineIndex == NOT_FOUND && !eofReached);
+        return curLine;
+    }
+};
+
+template<class T>
+class CircularBuffer{
+private:
+    T** array;
+    int size;
+    bool isFull;
+    int nextAddingPosition;
+public:
+    CircularBuffer(int n)
+    :isFull(false), nextAddingPosition(0), size(n)
+    {
+        array = new T*[n];
+    }
+    ~CircularBuffer(){
+        if (!isFull && nextAddingPosition == 0){
+            delete array;
+            return;
+        }
+        int start;
+        int end = end = (nextAddingPosition - 1) % size;
+        if (isFull){
+            start = nextAddingPosition;
+
+        }else{
+            start = 0;
+        }
+        int i = start;
+        while(true){
+            delete array[i];
+            if (i == end){
+                break;
+            }
+            i = (i + 1) % size;
+        }
+        delete array;
+    }
+    void add(const T& toAdd){
+        T* temp = new T(toAdd);
+        if (isFull){
+            delete array[nextAddingPosition];
+
+        }
+        array[nextAddingPosition] = temp;
+        nextAddingPosition = (nextAddingPosition + 1) % size;
+        if (nextAddingPosition == 0){
+            isFull = true;
+        }
+    }
+    std::list<T> getList(){
+        std::list<T> list;
+        if (!isFull && nextAddingPosition == 0){
+            return list;
+        }
+        int start;
+        int end = end = (nextAddingPosition - 1) % size;
+        if (isFull){
+            start = nextAddingPosition;
+
+        }else{
+            start = 0;
+        }
+        int i = start;
+        while(true){
+            list.push_back(*array[i]);
+            if (i == end){
+                break;
+            }
+            i = (i + 1) % size;
+        }
+        return list;
+    }
+};
+void TailCommand::execute() {
+    char * fileName;
+    int linesNum;
+    if (args[1] == nullptr){
+        throw SyntaxError();
+    }
+    if (args[2] == nullptr){
+        linesNum = 10;
+        fileName = args[1];
+    }else if (args[3] == nullptr){
+        linesNum = - str2int(args[1]);
+        fileName = args[2];
+    }else{
+        throw SyntaxError();
+    }
+    fileReader reader(fileName);
+    CircularBuffer<string> lines(linesNum);
+    try{
+        while(true){
+            lines.add(reader.getNextLine());
+        }
+    }catch(fileReader::EOFReached&){
+        //do nothing
+    }
+    auto list = lines.getList();
+    for(const string& line : list){
+        *outputStream << line << "\n";
+    }
+}
+
+TailCommand::TailCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 
 }
