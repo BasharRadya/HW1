@@ -46,18 +46,22 @@ void copyArgs(const char* const* src, char** dest){
 }
 
 
-Args::Args(char const* const*  args){
-    obj =  (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
-    copyArgs(args, obj);
-}
-Args::~Args(){
-    char** cur = obj;
+void freeargs(char** args){
+    char** cur = args;
     while(*cur != nullptr){
         free(*cur);
         cur++;
     }
     free(*cur);
-    free(obj);
+    free(args);
+}
+
+Args::Args(char const* const*  args){
+    obj =  (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
+    copyArgs(args, obj);
+}
+Args::~Args(){
+    freeargs(obj);
 }
  char const * const* Args::getObj() const{
     return obj;
@@ -104,12 +108,17 @@ auto prefixList = std::list<std::string>({
     string(">")
 });
 
-int _countRedirections(const char * cmd_line) {
+auto prefixListTouch = std::list<std::string>({
+                                                 string(":")
+                                         });
+
+
+int _countRedirections(const char * cmd_line,std::list<string>& fortouch=prefixList) {
     const char *cur = cmd_line;
     int count = 0;
     while (*cur != '\0') {
         bool found = false;
-        for(auto prefix : prefixList){
+        for(auto prefix : fortouch){
             if(isPrefixOf(prefix.c_str(), cur)){
                 count++;
                 cur += prefix.length();
@@ -130,15 +139,15 @@ void writeStrWithoutTermination(const char* copiedFrom, char* copiedTo){
         copiedFrom++;
     }
 }
-char* _addSpacesBeforeRedirections(const char * cmd_line){
-    int redirectionTimes = _countRedirections(cmd_line);
+char* _addSpacesBeforeRedirections(const char * cmd_line, std::list<string>& fortouch=prefixList ){
+    int redirectionTimes = _countRedirections(cmd_line,fortouch);
     int len = std::string(cmd_line).length();
-    char* temp = (char*) malloc(sizeof(char) * (len + redirectionTimes + 1));
+    char* temp = (char*) malloc(sizeof(char) * (len + redirectionTimes * 2 + 1));
     const char * copiedFrom = cmd_line;
     char * copiedTo = temp;
     while(*copiedFrom != '\0'){
         bool found = false;
-        for(const auto& prefix : prefixList){
+        for(const auto& prefix : fortouch){
             if (isPrefixOf(prefix.c_str(), copiedFrom)) {
                 string replacement = " " + prefix + " ";
                 writeStrWithoutTermination(replacement.c_str(), copiedTo);
@@ -159,11 +168,9 @@ char* _addSpacesBeforeRedirections(const char * cmd_line){
 }
 
 
-int _parseCommandLine(const char* cmd_line, char** args) {
+int _parseCommandLine(const char* cmd_line, char** args, std::list<string>& fortouch=prefixList ) {
   FUNC_ENTRY()
-
-  cmd_line = _addSpacesBeforeRedirections(cmd_line);
-
+  cmd_line = _addSpacesBeforeRedirections(cmd_line, fortouch);
   int i = 0;
   std::istringstream iss(_trim(string(cmd_line)).c_str());
   for(std::string s; iss >> s; ) {
@@ -200,7 +207,7 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell()
     :prompt("smash> "),
@@ -1216,14 +1223,50 @@ TouchCommand::TouchCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 }
 
 void TouchCommand::execute() {
+    /*
     struct tm d1 = {0};
-    std::get_time(&d1,args[1]);
-    (*outputStream) <<  to_string(d1.tm_sec) << "\n";
+    struct utimbuf newtime{};
+    char **argstouch = (char **) malloc(sizeof(char *) * 12); //check if malloc succesded
+    int x = _parseCommandLine(args[2], argstouch, prefixListTouch);
+    d1.tm_sec=str2int(argstouch[0]);
+    d1.tm_min=str2int(argstouch[2]);
+    d1.tm_hour=str2int(argstouch[4]);
+    d1.tm_yday=str2int(argstouch[6]);
+    d1.tm_mon=str2int(argstouch[8]);
+    d1.tm_year=str2int(argstouch[10]);
+    time_t test=mktime(&d1);
+    newtime.actime= test;
+    newtime.modtime= mktime(&d1);
+    utime(args[1],&newtime);
+    freeargs(argstouch); */
 
-    /* struct tm d1 = {0};
-    d1.tm_sec
-    struct utimbuf newtime;
-    newtime. */
+
+    struct tm * d1=(tm *) malloc(sizeof(tm));;
+    struct utimbuf newtime{};
+    char **argstouch = (char **) malloc(sizeof(char *) * 22); //check if malloc succesded
+    int x = _parseCommandLine(args[2], argstouch, prefixListTouch);
+    //time_t rawtime;
+    //time(&rawtime);
+   // d1= localtime(&rawtime);
+   // memset(d1, 0, sizeof *d1);
+
+
+    d1->tm_sec=str2int(argstouch[0]);
+    d1->tm_min=str2int(argstouch[2]);
+    d1->tm_hour=str2int(argstouch[4]);
+    d1->tm_mday=str2int(argstouch[6]);
+    d1->tm_mon=str2int(argstouch[8])-1;
+    d1->tm_year=str2int(argstouch[10])-1900;
+    d1->tm_isdst=-1;
+    newtime.actime= mktime(d1);
+    newtime.modtime= mktime(d1);
+    utime(args[1],&newtime);
+
+
+
+     free(d1);
+   freeargs(argstouch);
+
 
 }
 
