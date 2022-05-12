@@ -1216,7 +1216,7 @@ TouchCommand::TouchCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 void TouchCommand::execute() {
     struct tm d1 = {0};
     std::get_time(&d1,args[1]);
-    (*outputStream) <<  to_string(d1.tm_sec);
+    (*outputStream) <<  to_string(d1.tm_sec) << "\n";
 
     /* struct tm d1 = {0};
     d1.tm_sec
