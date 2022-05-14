@@ -588,6 +588,10 @@ std::string JobsList::JobEntry::toString() const {
     return ss.str();
 }
 
+bool JobsList::JobEntry::operator<(const JobsList::JobEntry &job) const {
+    return this->jobId < job.jobId;
+}
+
 std::string JobsList::toString2() const {
     string str;
     for(const JobsList::JobEntry& job : jobsList){
@@ -625,6 +629,7 @@ void JobsList::killAllJobs() {
 }
 
 void JobsList::update() {
+    jobsList.sort();
     auto iList = std::list<std::list<JobEntry>::iterator>();
     for(auto i = jobsList.begin(); i != jobsList.end(); ++i){
         JobEntry& job = *i;
@@ -1076,7 +1081,7 @@ void BackgroundCommand::execute() {
     CommandsPack* job;
     if (args[1] == nullptr){
         try {
-            jobsList.getLastStoppedJob(&jobId);
+            job = &jobsList.getLastStoppedJob(&jobId);
         }catch(NoStoppedJobs&){
             *errorStream << "smash error: bg: there is no stopped jobs to resume\n";
             return;
@@ -1128,7 +1133,6 @@ void ForegroundCommand::execute() {
     *outputStream << job->toString() << "\n";
     jobsList.runJob(jobId);
     jobsList.removeJobByIdToRunInForeground(jobId);
-    assert(smash.cur == nullptr);
     smash.cur = job;
     smash.wait();
 }
@@ -1607,7 +1611,7 @@ void TailCommand::execute() {
     if (args[2] == nullptr){
         linesNum = 10;
         fileName = args[1];
-    }else if (args[3] == nullptr && - str2int(args[1]) > 0){
+    }else if (args[3] == nullptr && - str2int(args[1]) >= 0){
         linesNum = - str2int(args[1]);
         fileName = args[2];
     }else{
@@ -1615,6 +1619,9 @@ void TailCommand::execute() {
         return;
     }
     fileReader reader(fileName);
+    if (linesNum == 0){
+        return;
+    }
     CircularBuffer<string> lines(linesNum);
     try{
         while(true){
@@ -1672,7 +1679,7 @@ AlarmControl::Entry::Entry(time_t alarmDuration, CommandsPack& cmd)
         }
     }
     void AlarmControl::alarmArrived(){
-        cout << "got an alarm\n";
+        cout << "smash: got an alarm\n";
         time_t curTime;
         time(&curTime);
         SmallShell::getInstance().jobsList.update();

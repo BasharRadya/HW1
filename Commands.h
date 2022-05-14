@@ -244,7 +244,7 @@ private:
         bool isStopped;
         int jobId;
         time_t insertionTime;
-
+        bool operator<(const JobEntry& job) const;
         JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t insertionTime);
         bool operator<(JobEntry& job) const;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
