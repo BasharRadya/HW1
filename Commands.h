@@ -71,6 +71,8 @@ public:
   virtual ~BuiltInCommand();
   void setRedirection(const std::string& file, RedirectionType type);
   void setOutPipe(userostream& os, PipeType type);
+
+    void cleanpipe();
 };
 
 class ExternalCommand : public Command {

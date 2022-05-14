@@ -17,6 +17,9 @@
 #include <fstream>
 #include <cstdio>
 #include <iomanip>
+#include <sys/types.h>
+#include <sys/stat.h>
+
 
 using namespace std;
 
@@ -466,6 +469,15 @@ void BuiltInCommand::setOutPipe(userostream& os, PipeType type) {
     }
 }
 
+void BuiltInCommand::cleanpipe() {
+    delete outputStream;
+    outputStream= nullptr;
+    delete errorStream;
+    errorStream= nullptr;
+
+
+}
+
 void ChangePromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     if(nullptr == args[1]){
@@ -543,6 +555,7 @@ void JobsList::addJob(CommandsPack *cmd, bool isStopped) {
 
     JobEntry newjob(*cmd, isStopped, newjob_id, newjob_time);
     jobsList.push_back(newjob);
+    jobsList.sort();
 }
 
 void JobsList::printJobsList() {
@@ -606,6 +619,7 @@ std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
 }
 
 std::ostream &operator<<(ostream &os, const JobsList& l) {
+
     for (const JobsList::JobEntry& job : l.jobsList){
         if (job.isStopped){
             os << job <<" (stopped)"<< std::endl;
@@ -645,6 +659,7 @@ void JobsList::update() {
     for(auto i : iList){
         jobsList.erase(i);
     }
+    jobsList.sort();
 }
 
 void JobsList::runJob(int jobId) {
@@ -708,7 +723,11 @@ CommandsPack&  JobsList::getLastStoppedJob(int* jobId){
 }
 
 CommandsPack &JobsList::getJobCommandById(int jobId) {
-    return getJobById(jobId)->command;
+    if( doesExist(jobId)){
+        return getJobById(jobId)->command;}
+    else{
+        throw JobDoesntExist();
+    }
 }
 
 bool JobsList::doesExist(int jobId) const {
@@ -876,7 +895,7 @@ void setFileAsOutput(string path, bool isAppended);
 
 void CommandsPack::execute() {
     auto i = programs.begin();
-    RedirectionControl control;
+    RedirectionControl& control=*(new RedirectionControl());
     while(i != programs.end()) {
         control.prepareFor(*i);
         //sleep(2);
@@ -888,6 +907,7 @@ void CommandsPack::execute() {
                 if (i->isLast()){
                     control.setRedirectionIfNeeded(outFile, outFileType);
                 }
+                delete &control;
                 cmd.execute();
             }else{
                 cmd.pid = forkResult;
@@ -900,11 +920,12 @@ void CommandsPack::execute() {
                 control.setRedirectionIfNeeded(outFile, outFileType);
             }
             cmd.execute();
+            cmd.cleanpipe();
         }
 
         ++i;
     }
-
+    delete &control;
 }
 
 bool CommandsPack::isSingleProgram() const {
@@ -1070,6 +1091,7 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line)
     :BuiltInCommand(cmd_line)
 {}
 
+
 void BackgroundCommand::execute() {
     if (args[1] != nullptr && args[2] != nullptr){
         *errorStream << "smash error: bg: invalid arguments\n";
@@ -1092,6 +1114,7 @@ void BackgroundCommand::execute() {
             *errorStream << "smash error: bg: job-id " << to_string(jobId) << " does not exist\n";
             return;
         }
+        job = &jobsList.getJobCommandById(jobId);
         if(jobsList.isStopped(jobId)){
             *errorStream << "smash error: bg: job-id " << to_string(jobId) << " is already running in the background\n";
             return;
@@ -1154,12 +1177,12 @@ void CommandsPack::Pipe::dupInputTo(int fd) {
 }
 
 void CommandsPack::Pipe::dupOutputTo(int fd) {
-    //cout << "pipe output connected fd:" << fd << " outpipe " << outPipe << " pid:" << getpid() << "\n";
+   // cout << "pipe output connected fd:" << fd << " outpipe " << outPipe << " pid:" << getpid() << "\n";
     dup2(outPipe, fd);
 }
 
 userostream *CommandsPack::Pipe::GetOutputStream() {
-    //cout << "pipe output connected pipe:" << outPipe << endl;
+   // cout << "pipe output connected pipe:" << outPipe << endl;
     return new userostream(outPipe);
 
 }
@@ -1183,10 +1206,12 @@ void CommandsPack::Pipe::SetNotToCloseOutput() {
 CommandsPack::Pipe::~Pipe() {
     if (closeInput){
         close(inPipe);
+       // std::cout << "in pipe "<<inPipe << " " << closeInput<< std::endl;
 
     }
     if (closeOutput){
         close(outPipe);
+        //std::cout << "out pipe "<<outPipe << " " << closeOutput<< std::endl;
     }
 }
 
@@ -1380,12 +1405,18 @@ TouchCommand::TouchCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 }
 
 void TouchCommand::execute() {
+    struct stat info;
+        stat(args[1],&info);
+    if( !S_ISREG(info.st_mode) ) // S_ISDIR() doesn't exist on my windows
+    {
+        throw SyscallFailure("utime");
+        return;}
     struct tm *d1 = nullptr;
     char **argstouch = nullptr;
     try {
         if (args[1] == nullptr || args[2] == nullptr || args[3] != nullptr) {
             *errorStream << "smash error: touch: invalid arguments\n";
-            return;
+            return ;
         }
         d1 = (tm *) malloc(sizeof(tm));
         if (d1 == nullptr) {
@@ -1407,7 +1438,11 @@ void TouchCommand::execute() {
         d1->tm_isdst = -1;
         newtime.actime = mktime(d1);
         newtime.modtime = mktime(d1);
-        utime(args[1], &newtime);
+        int fd=utime(args[1], &newtime);
+
+        if (syscallFailed(fd)){
+            throw SyscallFailure("utime");
+        }
         free(d1);
         freeArgs(argstouch);
     }catch(std::bad_alloc& e){
@@ -1572,7 +1607,7 @@ public:
 
         }
         array[nextAddingPosition] = temp;
-        nextAddingPosition = (nextAddingPosition + 1) % size;
+        nextAddingPosition = getNextIndex(nextAddingPosition);
         if (nextAddingPosition == 0){
             isFull = true;
         }
