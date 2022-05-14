@@ -32,12 +32,18 @@ using namespace std;
 #define FUNC_EXIT()
 #endif
 
+
+
+
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 void copyArgs(const char* const* src, char** dest){
     while(*src != nullptr){
         int len = strlen(*src);
         *dest = (char*) malloc(sizeof(char) * (len + 1));
+        if (*dest == nullptr){
+            throw std::bad_alloc();
+        }
         strcpy(*dest, *src);
         dest++;
         src++;
@@ -46,7 +52,7 @@ void copyArgs(const char* const* src, char** dest){
 }
 
 
-void freeargs(char** args){
+void freeArgs(char** args){
     char** cur = args;
     while(*cur != nullptr){
         free(*cur);
@@ -58,10 +64,19 @@ void freeargs(char** args){
 
 Args::Args(char const* const*  args){
     obj =  (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
-    copyArgs(args, obj);
+    if (obj == nullptr){
+        throw std::bad_alloc();
+    }
+    try {
+        copyArgs(args, obj);
+    }catch(std::bad_alloc&){
+        if(obj != nullptr){
+            freeArgs(obj);
+        }
+    }
 }
 Args::~Args(){
-    freeargs(obj);
+    freeArgs(obj);
 }
  char const * const* Args::getObj() const{
     return obj;
@@ -69,9 +84,16 @@ Args::~Args(){
 
 Args::Args(const Args &args) {
     obj =  (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
+    if (obj == nullptr){
+        throw std::bad_alloc();
+    }
     copyArgs(args.obj, obj);
 }
 
+
+bool syscallFailed(int returnValue){
+    return returnValue < 0;
+}
 
 string _ltrim(const std::string& s)
 {
@@ -101,24 +123,24 @@ bool isPrefixOf(const char* prefix, const char* str){
     return true;
 }
 
-auto prefixList = std::list<std::string>({
+auto redirectionSigns = std::list<std::string>({
     string("|&"),
     string("|"),
     string(">>"),
     string(">")
 });
 
-auto prefixListTouch = std::list<std::string>({
-                                                 string(":")
-                                         });
+auto timeSeparators = std::list<std::string>({
+    string(":")
+});
 
 
-int _countRedirections(const char * cmd_line,std::list<string>& fortouch=prefixList) {
+int _countSigns(const char * cmd_line, std::list<string>& signs = redirectionSigns) {
     const char *cur = cmd_line;
     int count = 0;
     while (*cur != '\0') {
         bool found = false;
-        for(auto prefix : fortouch){
+        for(auto prefix : signs){
             if(isPrefixOf(prefix.c_str(), cur)){
                 count++;
                 cur += prefix.length();
@@ -139,15 +161,18 @@ void writeStrWithoutTermination(const char* copiedFrom, char* copiedTo){
         copiedFrom++;
     }
 }
-char* _addSpacesBeforeRedirections(const char * cmd_line, std::list<string>& fortouch=prefixList ){
-    int redirectionTimes = _countRedirections(cmd_line,fortouch);
+char* _addSpacesBeforeAndAfterSigns(const char * cmd_line, std::list<string>& signs = redirectionSigns){
+    int redirectionTimes = _countSigns(cmd_line, signs);
     int len = std::string(cmd_line).length();
     char* temp = (char*) malloc(sizeof(char) * (len + redirectionTimes * 2 + 1));
+    if (temp == nullptr){
+        throw std::bad_alloc();
+    }
     const char * copiedFrom = cmd_line;
     char * copiedTo = temp;
     while(*copiedFrom != '\0'){
         bool found = false;
-        for(const auto& prefix : fortouch){
+        for(const auto& prefix : signs){
             if (isPrefixOf(prefix.c_str(), copiedFrom)) {
                 string replacement = " " + prefix + " ";
                 writeStrWithoutTermination(replacement.c_str(), copiedTo);
@@ -168,17 +193,21 @@ char* _addSpacesBeforeRedirections(const char * cmd_line, std::list<string>& for
 }
 
 
-int _parseCommandLine(const char* cmd_line, char** args, std::list<string>& fortouch=prefixList ) {
+int _parseCommandLine(const char* cmd_line, char** args, std::list<string>& separators = redirectionSigns ) {
   FUNC_ENTRY()
-  cmd_line = _addSpacesBeforeRedirections(cmd_line, fortouch);
+  cmd_line = _addSpacesBeforeAndAfterSigns(cmd_line, separators);
   int i = 0;
   std::istringstream iss(_trim(string(cmd_line)).c_str());
   for(std::string s; iss >> s; ) {
     args[i] = (char*)malloc(s.length()+1);
+    if(args[i] == nullptr){
+        throw std::bad_alloc();
+    }
     memset(args[i], 0, s.length()+1);
     strcpy(args[i], s.c_str());
     args[++i] = NULL;
   }
+  args[i] = nullptr;
   return i;
 
   FUNC_EXIT()
@@ -207,6 +236,14 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+int str2int(std::string s){
+    int x;
+    std::stringstream ss;
+    ss << s;
+    ss >> x;
+    return x;
+}
+
 // TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell()
@@ -228,48 +265,57 @@ SmallShell::~SmallShell() {
 */
 Command * CommandsPack::CreateCommand(const char* cmd_line){
   string cmd_s = _trim(string(cmd_line));
-  string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+  //string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-  char **args = (char**)malloc(sizeof(char*)*22); //check if malloc succesded
-
-  int x = _parseCommandLine(cmd_line,args);
-  if(nullptr==args[0])
-      return nullptr;
-  char* arg1=args[0];
-
-   if (firstWord.compare("chprompt") == 0) {
+  char **tempArgs = (char**)malloc(sizeof(char*)*22); //check if malloc succesded
+  if (tempArgs == nullptr){
+      throw std::bad_alloc();
+  }
+  int x = _parseCommandLine(cmd_s.c_str(),tempArgs);
+  std::string arg1;
+  if (*tempArgs == nullptr){
+      arg1 = "";
+  }else{
+      arg1 = tempArgs[0];
+  }
+  freeArgs(tempArgs);
+   if (arg1 == "chprompt") {
        return new ChangePromptCommand(cmd_line);
-     }else if (firstWord.compare("pwd") == 0) {
+     }else if (arg1 == "pwd") {
         return new GetCurrDirCommand(cmd_line);
-   }else if (firstWord.compare("cd") == 0) {
+   }else if (arg1 == "cd") {
         return new ChangeDirCommand(cmd_line);
-   }else if (firstWord.compare("jobs") == 0) {
+   }else if (arg1 == "jobs") {
        return new JobsCommand(cmd_line);
-   }else if (firstWord.compare("showpid") == 0) {
+   }else if (arg1 == "showpid") {
        return new ShowPidCommand(cmd_line);
-   }else if(firstWord.compare("kill") == 0) {
+   }else if(arg1 == "kill") {
        return new KillCommand(cmd_line);
-   }else if(firstWord.compare("bg") == 0){
+   }else if(arg1 == "bg"){
        return new BackgroundCommand(cmd_line);
-   }else if(firstWord.compare("fg") == 0){
+   }else if(arg1 == "fg"){
        return new ForegroundCommand(cmd_line);
-   }else if(firstWord.compare("quit") == 0){
+   }else if(arg1 == "quit"){
        quitExists = true;
        return new QuitCommand(cmd_line,&(SmallShell::getInstance().jobsList));
-   }else if(firstWord.compare("touch") == 0) {
+   }else if(arg1 == "touch") {
        return new TouchCommand(cmd_line);
-   }else if(firstWord.compare("tail") == 0){
+   }else if(arg1 == "tail"){
        return new TailCommand(cmd_line);
    }else{
        return new ExternalCommand(cmd_line);
    }
-   //return nullptr;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     std::string prompt;
     CommandsPack *cmd = new CommandsPack(cmd_line);
+    int alarmDuration = cmd->getAlarmDuration();
+    if (alarmDuration > 0){
+        SmallShell::getInstance().alarmControl.add(alarmDuration, *cmd);
+    }
+
     bool quitDone;
     if (cmd != nullptr) {
         jobsList.update();
@@ -302,7 +348,7 @@ bool SmallShell::prevDirExists() {
 }
 
 std::string SmallShell::getPrevDir() {
-    assert(prevDir != nullptr);
+    assert(prevDirExists());
     return *prevDir;
 }
 
@@ -312,11 +358,13 @@ void SmallShell::changePrevDir(std::string prev) {
 }
 
 void SmallShell::wait() {
-    int status = cur->wait();
-    if (WIFSTOPPED(status)){
+    int status;
+    int waitResult = cur->wait(&status);
+    if (waitResult == cur->getPid() && WIFSTOPPED(status)){
         jobsList.addJob(cur, true);
     }else{
         bool quitDone = cur->quitDone();
+        SmallShell::getInstance().alarmControl.removeIfContained(*cur);
         delete cur;
         cur = nullptr;
         if (quitDone){
@@ -328,24 +376,41 @@ void SmallShell::wait() {
 
 Command::Command(const char* cmd_line, bool areArgsReady, Args readyArgs )
     :cmd_line(cmd_line),
-     args((char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1))),
      doesNeedFork(false)
 
 {
-    if (_isBackgroundComamnd(cmd_line)){
-        int len = strlen(cmd_line);
-        char* temp = (char*) malloc(sizeof(char) * (len + 1));
-        strcpy(temp, cmd_line);
-        _removeBackgroundSign(temp);
-        cmd_line = temp;
-        doesRunInBackground = true;
-    }else{
-        doesRunInBackground = false;
-    }
-    if (!areArgsReady) {
-        _parseCommandLine(cmd_line, args);
-    }else{
-        copyArgs(readyArgs.getObj(), args);
+    args = nullptr;
+    char* temp = nullptr;
+    try {
+        args = (char **) malloc(sizeof(char *) * (MAX_ARGS_NUM + 1));
+        if (args == nullptr) {
+            throw std::bad_alloc();
+        }
+        if (_isBackgroundComamnd(cmd_line)) {
+            int len = strlen(cmd_line);
+            temp = (char *) malloc(sizeof(char) * (len + 1));
+            if (temp == nullptr) {
+                throw std::bad_alloc();
+            }
+            strcpy(temp, cmd_line);
+            _removeBackgroundSign(temp);
+            cmd_line = temp;
+            doesRunInBackground = true;
+        } else {
+            doesRunInBackground = false;
+        }
+
+        if (!areArgsReady) {
+            _parseCommandLine(cmd_line, args);
+        } else {
+            copyArgs(readyArgs.getObj(), args);
+        }
+    }catch(std::bad_alloc){
+        if (args != nullptr){
+            freeArgs(args);
+        }
+        free(temp);
+        throw std::bad_alloc();
     }
 }
 
@@ -364,29 +429,24 @@ GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line)
 std::string GetCurrDirCommand::getCurDir() {
     int size = pathconf(".", _PC_PATH_MAX);
     char curDir[size];
-    getcwd(curDir,sizeof(char)*size);
+    char * result = getcwd(curDir,sizeof(char)*size);
+    if (result == nullptr){
+
+        throw SyscallFailure("getcwd");
+    }
     return std::string(curDir);
 }
 
 BuiltInCommand::BuiltInCommand(const char* cmd_line)
-    :Command(cmd_line), outputStream(new userostream(cout))
+    :Command(cmd_line), outputStream(new userostream(cout)), errorStream(new userostream(cerr))
 {
 
 }
 
 void BuiltInCommand::setRedirection(const std::string& file, RedirectionType type) {
-    fstream* outStream = new fstream();
-    if (type == R_NORMAL){
-        outStream->open(file.c_str(), ios_base::out);
-    }else{
-        outStream->open(file.c_str(), ios_base::out | std::ios_base::app);
-    }
-    if ((outStream->rdstate() & std::ifstream::failbit) != 0){
-        throw FileError();
-    }else{
-        delete outputStream;
-        outputStream = new userostream(*outStream);
-    }
+    userostream* temp = new userostream(file, type);
+    delete outputStream;
+    outputStream = temp;
 }
 
 
@@ -410,10 +470,10 @@ void ChangePromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     if(nullptr == args[1]){
         smash.prompt = "smash> ";
+    }else {
+        const char *arg2 = args[1];
+        smash.prompt = std::string(arg2) + std::string("> ");
     }
-    const char* arg2 = args[1];
-    smash.prompt = arg2;
-    smash.prompt.append(std::string("> "));
 }
 
 ChangePromptCommand::ChangePromptCommand(const char *cmd_line) : BuiltInCommand(cmd_line)
@@ -430,23 +490,31 @@ ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) 
 
 void ChangeDirCommand::execute() {
     if (args[1] == nullptr){
-        //TODO
+        *errorStream << "smash error: cd: too few arguments" << "\n";
+        return;
     }else if (args[2] == nullptr){
+        std::string newDir = args[1];
+
         SmallShell& smash = SmallShell::getInstance();
         std::string prevDir = GetCurrDirCommand::getCurDir();
         int changeResult;
-        if (std::string(args[1]) == std::string("-")){
-            changeResult = chdir(smash.getPrevDir().c_str());
+        if (newDir == std::string("-")){
+            if (smash.prevDirExists()) {
+                changeResult = chdir(smash.getPrevDir().c_str());
+            }else{
+                *errorStream << "smash error: cd: OLDPWD not set\n";
+                return;
+            }
         }else{
-            changeResult = chdir(args[1]);
+            changeResult = chdir(newDir.c_str());
         }
-        if (changeResult == CHANGE_FAILURE){
-            //TODO
+        if (syscallFailed(changeResult)){
+            throw SyscallFailure("chdir");
         }else{
             smash.changePrevDir(prevDir);
         }
     }else{
-        *outputStream << "smash error: cd: too many arguments" << "\n";
+        *errorStream << "smash error: cd: too many arguments" << "\n";
     }
 
 }
@@ -498,8 +566,8 @@ void JobsCommand::execute() {
     *outputStream << smash.jobsList.toString();
 }
 
-JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, time_t time_insert)
-                            :command(command),isStopped(isStopped),jobId(jobId),time_insert(time_insert) {
+JobsList::JobEntry::JobEntry(CommandsPack &command, bool isStopped, int jobId, time_t insertionTime)
+                            : command(command), isStopped(isStopped), jobId(jobId), insertionTime(insertionTime) {
 
 }
 
@@ -510,7 +578,7 @@ bool JobsList::JobEntry::operator<(JobsList::JobEntry &job) const {
 std::ostream &operator<<(ostream &os, const JobsList::JobEntry &entry) {
     time_t time_print;
     time(&time_print);
-    os << "[" << entry.jobId <<"] "<< entry.command<< " " <<difftime( time_print,entry.time_insert)<<" secs";
+    os << "[" << entry.jobId << "] " << entry.command << " " << difftime( time_print,entry.insertionTime) << " secs";
     return os;
 }
 
@@ -529,14 +597,14 @@ std::string JobsList::toString2() const {
 }
 
 std::ostream &operator<<(ostream &os, const CommandsPack &cmd) {
-    os << *(cmd.programs.front().command) << " : " << cmd.getPid() ;
+    os << dynamic_cast<const Command&>(cmd) << " : " << cmd.getPid() ;
     return os;
 }
 
 std::ostream &operator<<(ostream &os, const JobsList& l) {
     for (const JobsList::JobEntry& job : l.jobsList){
         if (job.isStopped){
-            os << job <<" stopped"<< std::endl;
+            os << job <<" (stopped)"<< std::endl;
         }
     }
     for (const JobsList::JobEntry& job : l.jobsList){
@@ -559,12 +627,13 @@ void JobsList::killAllJobs() {
 void JobsList::update() {
     auto iList = std::list<std::list<JobEntry>::iterator>();
     for(auto i = jobsList.begin(); i != jobsList.end(); ++i){
-        int status;
         JobEntry& job = *i;
-        int waitResult = waitpid(job.command.getPid(), &status, WNOHANG); //TODO check if return value is needed
+        int status;
+        int waitResult = job.command.wait(&status, true); //TODO check if return value is needed
         //if process changed state
 
         if (waitResult == job.command.getPid() && (WIFEXITED(status) || WIFSIGNALED(status))){
+            SmallShell::getInstance().alarmControl.removeIfContained(i->command);
             iList.push_back(i);
         }
     }
@@ -573,7 +642,7 @@ void JobsList::update() {
     }
 }
 
-void JobsList::RunJob(int jobId) {
+void JobsList::runJob(int jobId) {
     JobEntry* job = getJobById(jobId);
     assert(job != nullptr);
     if (!job->isStopped){
@@ -584,7 +653,7 @@ void JobsList::RunJob(int jobId) {
     }
 }
 
-void JobsList::StopJob(int jobId) {
+void JobsList::stopJob(int jobId) {
     JobEntry* job = getJobById(jobId);
     assert(job != nullptr);
     job->isStopped = true;
@@ -652,6 +721,10 @@ std::string JobsList::toString() const {
     return ss.str();
 }
 
+int JobsList::getSize() const {
+    return jobsList.size();
+}
+
 Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
     std::string commandArg =  std::string(cmd_line);
     const char * args[4];
@@ -663,7 +736,7 @@ Args ExternalCommand::getModifiedLine(const char * cmd_line) const{
 
 }
 
-ExternalCommand::ExternalCommand(const char *cmd_line)
+ExternalCommand::ExternalCommand(const char* cmd_line)
     :Command(cmd_line, true, getModifiedLine(cmd_line)) ,
      pid(0)
 {
@@ -672,12 +745,11 @@ ExternalCommand::ExternalCommand(const char *cmd_line)
 
 void ExternalCommand::execute() {
     int result = setpgrp();
-    if(result == FAILURE){
-        //TODO
-    }
     execv(args[0],args);
-
+    throw SyscallFailure("execv");
 }
+
+
 
 CommandsPack::CommandsPack(const char *cmd_line)
 : Command(cmd_line), outFile(), quitExists(false), outFileType(R_NONE)
@@ -686,8 +758,18 @@ CommandsPack::CommandsPack(const char *cmd_line)
         //TODO
         return;
     }
+    int curArg;
     const static int MAX_PROCESSES_NUM = 100;
-    int curArg = 0;
+    if (args[0] != nullptr && args[0] == std::string("timeout")) {
+        if (args[1] == nullptr || str2int(args[1]) <= 0) {
+            std::cerr << "timeout : syntax error\n";
+            return;
+        }
+        curArg = 2;
+        //SmallShell::getInstance().alarmControl.add(str2int(args[1]), *this);
+    }else {
+        curArg = 0;
+    }
     int curProgramIndex = 0;
     while(true){
         if (endOfTextDetected(curArg)){
@@ -727,7 +809,7 @@ bool Command::redirectionDetected(int curArg) const {
     bool result = (areEqual(args[curArg], ">") ||
             areEqual(args[curArg], ">>") ||
             areEqual(args[curArg], "|") ||
-            areEqual(args[curArg], "&|"));
+            areEqual(args[curArg], "|&"));
     if (!result){
         return false;
     }
@@ -742,12 +824,16 @@ std::string Command::toString2() const {
     return cmd_line;
 }
 
+Command::~Command() {
+    freeArgs(args);
+}
+
 
 int CommandsPack::setRedirection(int curArg) {
     if (areEqual(args[curArg], "|")){
         programs.back().pipeType = P_NORMAL;
         return curArg + 1;
-    }else if (areEqual(args[curArg], "&|")){
+    }else if (areEqual(args[curArg], "|&")){
         programs.back().pipeType = P_ERR;
         return curArg + 1;
     }else if (areEqual(args[curArg], ">")){
@@ -762,7 +848,6 @@ int CommandsPack::setRedirection(int curArg) {
 }
 
 int CommandsPack::addProgram(int curArg) {
-    (char**)malloc(sizeof(char*) * (MAX_ARGS_NUM + 1));
     int cur = curArg;
     std::string cmd("");
     while(!endOfTextDetected(cur) && !redirectionDetected(cur)){
@@ -832,31 +917,46 @@ pid_t CommandsPack::getPid() const {
     throw NoForkNeededInPack();
 }
 
-int CommandsPack::wait() {
+int CommandsPack::wait(int* status, bool noHang) {
     //it is assumed that the status of the processes is the same
-    int status;
     int curStatus;
     bool oneProgramHalted = false;
+    bool noProgramResponded = true;
+    bool noHangEnabled;
+    if (noHang){
+        noHangEnabled = 1;
+    }else{
+        noHangEnabled = 0;
+    }
     for(auto i = programs.begin(); i != programs.end(); ++i){
         if (i->command->doesNeedFork && (!i->terminated)) {
             ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(i->command);
-            int waitResult = waitpid(cmd.pid, &curStatus, WUNTRACED);
+            int waitResult = waitpid(cmd.pid, &curStatus, WUNTRACED | (noHangEnabled * WNOHANG));
+            if (waitResult == cmd.pid){
+                noProgramResponded = false;
+            }
             if (waitResult == cmd.pid && (WIFEXITED(curStatus) || WIFSIGNALED(curStatus))){
                 i->terminated = true;
                 //cout << "program terminated\n";
                 if (!oneProgramHalted){
-                    status = curStatus;
+                    *status = curStatus;
 
                 }
             }else if (waitResult == cmd.pid && WIFSTOPPED(curStatus)){ //program halted
                 //cout << "program halted\n";
-                status = curStatus;
+                *status = curStatus;
                 oneProgramHalted = true;
             }
 
         }
     }
-    return status;
+
+
+    if (noProgramResponded){
+        return 0;
+    } else{
+        return this->getPid();
+    }
 
 
 
@@ -867,7 +967,10 @@ void CommandsPack::sendSig(int signum){
         if (program.command->doesNeedFork && !program.terminated) {
             //cout << "sent sig:" << signum << "\n";
             ExternalCommand& cmd = *dynamic_cast<ExternalCommand*>(program.command);
-            kill(cmd.pid, signum);
+            int result = kill(cmd.pid, signum);
+            if (syscallFailed(result)){
+                throw SyscallFailure("kill");
+            }
         }
     }
 }
@@ -879,7 +982,6 @@ std::string CommandsPack::toString() const {
 }
 
 CommandsPack::~CommandsPack() {
-
 }
 
 std::string CommandsPack::toString2() const {
@@ -895,41 +997,48 @@ bool CommandsPack::quitDone() const{
     return quitExists;
 }
 
+int CommandsPack::getAlarmDuration() const {
+    if(args[0] != nullptr && args[1] != nullptr){
+        if (args[0] == string("timeout")){
+            return str2int(args[1]);
+        }
+    }
+    return 0;
+}
+
 
 KillCommand::KillCommand(const char *cmd_line)
     : BuiltInCommand(cmd_line)
 {}
 
-int str2int(std::string s){
-    int x;
-    std::stringstream ss;
-    ss << s;
-    ss >> x;
-    return x;
-}
+
 
 void KillCommand::execute() {
+    if (args[1] == nullptr || args[2] == nullptr || args[3] != nullptr){
+        *errorStream << "smash error: kill: invalid arguments\n";
+        return;
+    }
     SmallShell& smash = SmallShell::getInstance();
     CommandsPack* job;
-    int jobId = str2int(args[1]);
+    int jobId = str2int(args[2]);
     try{
         job = &smash.jobsList.getJobCommandById(jobId);
     }catch(JobDoesntExist&){
-        *outputStream << "smash error: kill: job-id " << to_string(jobId) << " does not exist" << "\n";
+        *errorStream << "smash error: kill: job-id " << to_string(jobId) << " does not exist" << "\n";
         return;
     }
     pid_t pid = job->getPid();
-    int signal = - str2int(args[2]);
+    int signal = - str2int(args[1]);
+    if (signal <= 0){
+        *errorStream << "smash error: kill: invalid arguments\n";
+        return;
+    }
     if (signal == SIGSTOP){
-        smash.jobsList.StopJob(jobId);
+        smash.jobsList.stopJob(jobId);
     }else if (signal == SIGCONT){
-        smash.jobsList.RunJob(jobId);
+        smash.jobsList.runJob(jobId);
     }else{
-        int result = kill(pid, signal);
-        if (result == FAILURE){
-            //TODO
-            throw SyscallFailure();
-        }
+        job->sendSig(signal);
     }
     *outputStream << "signal number " << to_string(signal) << " was sent to pid " << to_string(pid) << "\n";
 }
@@ -957,18 +1066,34 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line)
 {}
 
 void BackgroundCommand::execute() {
+    if (args[1] != nullptr && args[2] != nullptr){
+        *errorStream << "smash error: bg: invalid arguments\n";
+        return;
+    }
     SmallShell& smash = SmallShell::getInstance();
     JobsList& jobsList = smash.jobsList;
     int jobId;
     CommandsPack* job;
     if (args[1] == nullptr){
-        jobsList.getLastStoppedJob(&jobId);
+        try {
+            jobsList.getLastStoppedJob(&jobId);
+        }catch(NoStoppedJobs&){
+            *errorStream << "smash error: bg: there is no stopped jobs to resume\n";
+            return;
+        }
     }else{
         jobId = str2int(args[1]);
-        assert(jobsList.doesExist(jobId));
-        assert(jobsList.isStopped(jobId));
+        if(!jobsList.doesExist(jobId)){
+            *errorStream << "smash error: bg: job-id " << to_string(jobId) << " does not exist\n";
+            return;
+        }
+        if(jobsList.isStopped(jobId)){
+            *errorStream << "smash error: bg: job-id " << to_string(jobId) << " is already running in the background\n";
+            return;
+        }
     }
-    jobsList.RunJob(jobId);
+    *outputStream << job->toString() << "\n";
+    jobsList.runJob(jobId);
 }
 
 
@@ -977,18 +1102,31 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line) : BuiltInCommand(cmd_
 }
 
 void ForegroundCommand::execute() {
+    if (args[1] != nullptr && args[2] != nullptr){
+        *errorStream << "smash error: fg: invalid arguments\n";
+        return;
+    }
     SmallShell& smash = SmallShell::getInstance();
     JobsList& jobsList = smash.jobsList;
     int jobId;
     CommandsPack* job;
     if (args[1] == nullptr){
-        job = &jobsList.getLastJob(&jobId);
+        try{
+            job = &jobsList.getLastJob(&jobId);
+        }catch(NoJobs&){
+            *errorStream << "smash error: fg: jobs list is empty\n";
+            return;
+        }
     }else{
         jobId = str2int(args[1]);
-        assert(jobsList.doesExist(jobId));
+        if (!jobsList.doesExist(jobId)){
+            *errorStream << "smash error: fg: job-id " << to_string(jobId) << " does not exist\n";
+            return;
+        }
         job = &jobsList.getJobCommandById(jobId);
     }
-    jobsList.RunJob(jobId);
+    *outputStream << job->toString() << "\n";
+    jobsList.runJob(jobId);
     jobsList.removeJobByIdToRunInForeground(jobId);
     assert(smash.cur == nullptr);
     smash.cur = job;
@@ -1050,36 +1188,47 @@ CommandsPack::Pipe::~Pipe() {
 
 
 userostream &operator<<(userostream &os, const string &str) {
-    if (os.cStyleFile){
-        write(os.fd, str.c_str(), str.length());
-        return os;
-    }else{
-        *os.stream << str;
-        return os;
+    int writeResult = write(os.fd, str.c_str(), str.length());
+    if (syscallFailed(writeResult)){
+        throw SyscallFailure("write");
     }
+    return os;
 
 }
 
-userostream::userostream(int fd){
-    //file = fdopen(fd, "a");
-    cStyleFile = true;
-    this->fd = fd;
-}
 
-userostream::userostream(ostream &stream) {
-    this->stream = &stream;
-    cStyleFile = false;
+
+userostream::userostream(std::ostream& stream) {
+    if (&stream == &std::cout){
+        fd = 1;
+    }else if (&stream == &std::cerr){
+        fd = 2;
+    }else{
+        throw Unsupported();
+    }
 }
 
 userostream::~userostream() {
-    if (cStyleFile){
+    if (fd > 2){
         close(fd);
-    }else{
-        if (stream != &std::cout && stream != &std::cerr){
-            dynamic_cast<fstream*>(stream)->close();
-            delete stream;
-        }
     }
+}
+
+userostream::userostream(std::string path, RedirectionType type) {
+    int flags;
+    if (type == R_NORMAL){
+        flags = O_WRONLY | O_TRUNC | O_CREAT;
+    }else{
+        flags = O_WRONLY | O_CREAT | O_APPEND;
+    }
+    fd = open(path.c_str(), flags,S_IRUSR|S_IWUSR);
+    if (syscallFailed(fd)){
+        throw SyscallFailure("open");
+    }
+}
+
+userostream::userostream(int fd) {
+    this->fd = fd;
 }
 
 
@@ -1116,7 +1265,7 @@ void CommandsPack::RedirectionControl::setCurProgramOutPipeIfNeeded() {
         if (curProgram->pipeType == P_NORMAL) {
             curPipe->dupOutputTo(1);
         }else if (curProgram->pipeType == P_ERR){
-            curPipe->dupOutputTo(1);
+            curPipe->dupOutputTo(2);
         }
     }else{
         BuiltInCommand& cmd = *dynamic_cast<BuiltInCommand*>(curProgram->command);
@@ -1170,6 +1319,7 @@ void CommandsPack::RedirectionControl::inFather() {
 }
 
 void CommandsPack::RedirectionControl::inSon() {
+
     setPipingIfNeeded();
     cleanupCurProgramPipe();
 }
@@ -1213,7 +1363,10 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs): BuiltInCommand(c
 
 void QuitCommand::execute() {
     if(args[1] != nullptr && areEqual(args[1],"kill")){
-        *outputStream << SmallShell::getInstance().jobsList.toString2();
+        JobsList& jobsList = SmallShell::getInstance().jobsList;
+        jobsList.update();
+        *outputStream << "smash: sending SIGKILL signal to " << to_string(jobsList.getSize()) << " jobs:\n";
+        *outputStream << jobsList.toString2();
         jobs->killAllJobs();
     }
 }
@@ -1223,57 +1376,48 @@ TouchCommand::TouchCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 }
 
 void TouchCommand::execute() {
-    /*
-    struct tm d1 = {0};
-    struct utimbuf newtime{};
-    char **argstouch = (char **) malloc(sizeof(char *) * 12); //check if malloc succesded
-    int x = _parseCommandLine(args[2], argstouch, prefixListTouch);
-    d1.tm_sec=str2int(argstouch[0]);
-    d1.tm_min=str2int(argstouch[2]);
-    d1.tm_hour=str2int(argstouch[4]);
-    d1.tm_yday=str2int(argstouch[6]);
-    d1.tm_mon=str2int(argstouch[8]);
-    d1.tm_year=str2int(argstouch[10]);
-    time_t test=mktime(&d1);
-    newtime.actime= test;
-    newtime.modtime= mktime(&d1);
-    utime(args[1],&newtime);
-    freeargs(argstouch); */
+    struct tm *d1 = nullptr;
+    char **argstouch = nullptr;
+    try {
+        if (args[1] == nullptr || args[2] == nullptr || args[3] != nullptr) {
+            *errorStream << "smash error: touch: invalid arguments\n";
+            return;
+        }
+        d1 = (tm *) malloc(sizeof(tm));
+        if (d1 == nullptr) {
+            throw std::bad_alloc();
+        }
+        struct utimbuf newtime{};
+        argstouch = (char **) malloc(sizeof(char *) * 22); //check if malloc succesded
+        if (argstouch == nullptr) {
+            throw std::bad_alloc();
+        }
+        int x = _parseCommandLine(args[2], argstouch, timeSeparators);
 
-
-    struct tm * d1=(tm *) malloc(sizeof(tm));;
-    struct utimbuf newtime{};
-    char **argstouch = (char **) malloc(sizeof(char *) * 22); //check if malloc succesded
-    int x = _parseCommandLine(args[2], argstouch, prefixListTouch);
-    //time_t rawtime;
-    //time(&rawtime);
-   // d1= localtime(&rawtime);
-   // memset(d1, 0, sizeof *d1);
-
-
-    d1->tm_sec=str2int(argstouch[0]);
-    d1->tm_min=str2int(argstouch[2]);
-    d1->tm_hour=str2int(argstouch[4]);
-    d1->tm_mday=str2int(argstouch[6]);
-    d1->tm_mon=str2int(argstouch[8])-1;
-    d1->tm_year=str2int(argstouch[10])-1900;
-    d1->tm_isdst=-1;
-    newtime.actime= mktime(d1);
-    newtime.modtime= mktime(d1);
-    utime(args[1],&newtime);
-
-
-
-     free(d1);
-   freeargs(argstouch);
-
-
+        d1->tm_sec = str2int(argstouch[0]);
+        d1->tm_min = str2int(argstouch[2]);
+        d1->tm_hour = str2int(argstouch[4]);
+        d1->tm_mday = str2int(argstouch[6]);
+        d1->tm_mon = str2int(argstouch[8]) - 1;
+        d1->tm_year = str2int(argstouch[10]) - 1900;
+        d1->tm_isdst = -1;
+        newtime.actime = mktime(d1);
+        newtime.modtime = mktime(d1);
+        utime(args[1], &newtime);
+        free(d1);
+        freeArgs(argstouch);
+    }catch(std::bad_alloc& e){
+        free(d1);
+        if (argstouch != nullptr) {
+            freeArgs(argstouch);
+        }
+        throw e;
+    }
 }
 
 class fileReader{
 private:
     enum BufferExtractionType{B_NL_REACHED, B_BUFFER_ENDED, B_EOF_REACHED};
-    bool readBefore;
     int fd;
     bool eofReachedInBuffer;
     bool noMoreLines;
@@ -1335,6 +1479,9 @@ private:
     void readToBuffer(){
         bufferCurIndex = 0;
         int numOfCharsRead = read(fd, buffer, BUFFER_SIZE);
+        if (syscallFailed(numOfCharsRead)){
+            throw SyscallFailure("read");
+        }
         if (numOfCharsRead < BUFFER_SIZE) {
             eofReachedInBuffer = true;
             bufferSizeAfterEof = numOfCharsRead;
@@ -1345,11 +1492,19 @@ public:
     explicit fileReader(const string& path){
         fd = open(path.c_str(), O_RDONLY);
         if (fd < 0){
-            throw FileError();
+            throw SyscallFailure("open");
         }
         eofReachedInBuffer = false;
         noMoreLines = false;
-        readToBuffer();
+        try{
+            readToBuffer();
+        }catch(SyscallFailure& e){
+            close(fd);
+            throw e;
+        }
+    }
+    ~fileReader(){
+        close(fd);
     }
     std::string getNextLine() {
         if (noMoreLines) {
@@ -1385,7 +1540,7 @@ private:
         return (i + 1) % size;
     }
     int getPrevIndex(int i){
-        return (i - 1) % size;
+        return (i - 1 + size) % size;
     }
 
 public:
@@ -1446,16 +1601,18 @@ void TailCommand::execute() {
     char * fileName;
     int linesNum;
     if (args[1] == nullptr){
-        throw SyntaxError();
+        *errorStream << "smash error: tail: invalid arguments\n";
+        return;
     }
     if (args[2] == nullptr){
         linesNum = 10;
         fileName = args[1];
-    }else if (args[3] == nullptr){
+    }else if (args[3] == nullptr && - str2int(args[1]) > 0){
         linesNum = - str2int(args[1]);
         fileName = args[2];
     }else{
-        throw SyntaxError();
+        *errorStream << "smash error: tail: invalid arguments\n";
+        return;
     }
     fileReader reader(fileName);
     CircularBuffer<string> lines(linesNum);
@@ -1475,3 +1632,60 @@ void TailCommand::execute() {
 TailCommand::TailCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 
 }
+
+
+AlarmControl::Entry::Entry(time_t alarmDuration, CommandsPack& cmd)
+        :cmd(cmd), terminated(false)
+        {
+            time_t curTime;
+            time(&curTime);
+            alarmTime = alarmDuration + curTime;
+        }
+        bool AlarmControl::Entry::operator<(const Entry& compTo) const{
+            return this->alarmTime < compTo.alarmTime;
+        }
+
+
+    void AlarmControl::add(time_t alarmDuration, CommandsPack& cmd){
+        Entry entry(alarmDuration, cmd);
+        if (entries.empty()){
+            alarm(alarmDuration);
+        }else if (entries.front().alarmTime > entry.alarmTime){
+            alarm(alarmDuration);
+        }
+        entries.push_back(entry);
+        entries.sort();
+    }
+    void AlarmControl::removeIfContained(CommandsPack& toDelete){
+        for(auto i = entries.begin(); i != entries.end(); ++i){
+            if (&(i->cmd) == &toDelete){
+                i->terminated = true;
+                return;
+            }
+        }
+    }
+    void AlarmControl::alarmArrived(){
+        cout << "got an alarm\n";
+        time_t curTime;
+        time(&curTime);
+        SmallShell::getInstance().jobsList.update();
+        auto iList = std::list<std::list<Entry>::iterator>();
+        for(auto i = entries.begin(); i != entries.end(); ++i){
+            if (i->alarmTime <= curTime){
+                iList.push_back(i);
+            }else{
+                break;
+            }
+        }
+        for(auto i : iList){
+            if (!(i->terminated)){
+                std::cout << "smash: " << dynamic_cast<Command&>(i->cmd) <<" timed out!\n";
+                i->cmd.sendSig(SIGKILL);
+            }
+            entries.erase(i);
+        }
+        if (!entries.empty()){
+            alarm(entries.front().alarmTime - curTime);
+        }
+    }
+

@@ -7,7 +7,7 @@
 #include <stack>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
-const static int FAILURE = -1;
+const static int SYSCALL_FAILURE = -1;
 static const int MAX_ARGS_NUM = 21;
 
 enum RedirectionType{R_NONE, R_NORMAL, R_APPEND};
@@ -36,8 +36,8 @@ protected:
 public:
     bool doesRunInBackground;
     bool doesNeedFork; //default value is false
-  explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs =Args(EMPTY_ARGS));
-  virtual ~Command(){};
+  explicit Command(const char* cmd_line, bool areArgsReady = false , Args readyArgs = Args(EMPTY_ARGS));
+  virtual ~Command();
   virtual void execute() = 0;
   std::string toString2() const;
   friend std::ostream& operator<<(std::ostream& os, const Command& cmd);
@@ -50,12 +50,12 @@ std::ostream& operator<<(std::ostream& os, const Command& cmd);
 class userostream{
 private:
     int fd;
-    std::ostream* stream;
-    bool cStyleFile;
 public:
-    explicit userostream(int fd);
-    explicit userostream(std::ostream& stream);
+    userostream(std::string path, RedirectionType type);
+    userostream(std::ostream& stream);
+    userostream(int fd);
     ~userostream();
+class Unsupported : public std::exception{};
     friend userostream& operator<<(userostream& os, const std::string& string);
 };
 userostream& operator<<(userostream& os, const std::string& str);
@@ -152,11 +152,11 @@ public:
     CommandsPack(const char* cmd_line);
     ~CommandsPack() override;
   void execute() override;
-
+    int getAlarmDuration() const;
     bool isSingleProgram() const;
     pid_t getPid() const;
 
-    int wait();
+    int wait(int* status, bool noHang = false);
     void sendSig(int signum);
     bool quitDone() const;
     std::string toString() const;
@@ -243,9 +243,9 @@ private:
         CommandsPack& command;
         bool isStopped;
         int jobId;
-        time_t time_insert;
+        time_t insertionTime;
 
-        JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t time_insert);
+        JobEntry(CommandsPack& command,bool isStopped,int jobId,time_t insertionTime);
         bool operator<(JobEntry& job) const;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
         std::string toString() const;
@@ -266,10 +266,11 @@ public:
   void removeJobByIdToRunInForeground(int jobId);
   CommandsPack& getLastJob(int* jobId);
   CommandsPack& getLastStoppedJob(int* jobId);
-  void StopJob(int jobId);
-  void RunJob(int jobId);
+  void stopJob(int jobId);
+  void runJob(int jobId);
   bool doesExist(int jobId) const;
   bool isStopped(int jobId) const;
+  int getSize() const;
   std::string toString2() const;
   // TODO: Add extra methods or modify exisitng ones as needed
   //JobEntry& operator[](int x) ;
@@ -331,6 +332,24 @@ class TouchCommand : public BuiltInCommand {
 };
 
 
+class AlarmControl{
+private:
+    class Entry{
+    public:
+        bool terminated;
+        time_t alarmTime;
+        CommandsPack& cmd;
+        Entry(time_t alarmDuration, CommandsPack& cmd);
+        bool operator<(const Entry& compTo) const;
+    };
+    std::list<Entry> entries;
+public:
+    AlarmControl() = default;
+    void add(time_t alarmDuration, CommandsPack& cmd);
+    void removeIfContained(CommandsPack& toDelete);
+    void alarmArrived();
+};
+
 class SmallShell {
  private:
   // TODO: Add your data members
@@ -341,6 +360,7 @@ public:
     std::string prompt;
     JobsList jobsList;
     CommandsPack* cur;
+    AlarmControl alarmControl;
     bool prevDirExists();
     std::string getPrevDir();
     void changePrevDir(std::string prev);
@@ -360,7 +380,15 @@ public:
 
 
 class SyntaxError : public std::exception{};
-class SyscallFailure : public std::exception{};
+class SyscallFailure : public std::exception{
+private:
+    const std::string name;
+public:
+    explicit SyscallFailure(const std::string& name): std::exception(), name(name){}
+    void report() const{
+        perror(("smash error: " + name + " failed").c_str());
+    }
+};
 class JobDoesntExist : public std::exception{};
 class FileError : public std::exception{};
 class NoJobs : public std::exception{};
