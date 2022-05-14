@@ -1624,8 +1624,15 @@ void TailCommand::execute() {
         //do nothing
     }
     auto list = lines.getList();
+    bool isFirst = true;
     for(const string& line : list){
-        *outputStream << line << "\n";
+        if(isFirst){
+            isFirst = false;
+        }else{
+            *outputStream << "\n";
+        }
+        *outputStream << line;
+
     }
 }
 
